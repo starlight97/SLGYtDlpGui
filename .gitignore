@@ -52,3 +52,9 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Claude Code
+.claude/
+
+# Download folder
+[Dd]own[Ll]oad/

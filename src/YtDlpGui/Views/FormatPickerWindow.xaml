@@ -1,0 +1,114 @@
+<Window x:Class="YtDlpGui.Views.FormatPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Format inspector"
+        Width="980" Height="640"
+        MinWidth="780" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+  <Grid Background="#F5F5F5">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- URL bar -->
+    <Border Grid.Row="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="12,10">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBox Grid.Column="0" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
+        <Button Grid.Column="1" Content="Inspect" Padding="14,4" MinWidth="92" Margin="8,0,0,0"
+                Command="{Binding RunInspectCommand}" IsDefault="True" />
+        <Button Grid.Column="2" Content="Cancel" Padding="10,4" MinWidth="80" Margin="6,0,0,0"
+                Command="{Binding CancelInspectCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Formats grid -->
+    <Border Grid.Row="1" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+      <DataGrid ItemsSource="{Binding Formats}"
+                SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                AutoGenerateColumns="False"
+                CanUserAddRows="False"
+                CanUserDeleteRows="False"
+                IsReadOnly="True"
+                HeadersVisibility="Column"
+                GridLinesVisibility="Horizontal"
+                AlternatingRowBackground="#FAFAFA"
+                FontSize="12">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="ID"           Binding="{Binding Id}"            Width="60"  FontFamily="Consolas, Cascadia Mono" />
+          <DataGridTextColumn Header="Ext"          Binding="{Binding Ext}"           Width="56" />
+          <DataGridTextColumn Header="Resolution"   Binding="{Binding Resolution}"    Width="100" />
+          <DataGridTextColumn Header="FPS"          Binding="{Binding FpsText}"       Width="50" />
+          <DataGridTextColumn Header="VCodec"       Binding="{Binding Vcodec}"        Width="120" />
+          <DataGridTextColumn Header="ACodec"       Binding="{Binding Acodec}"        Width="100" />
+          <DataGridTextColumn Header="Filesize"     Binding="{Binding FilesizeText}"  Width="86" />
+          <DataGridTextColumn Header="TBR"          Binding="{Binding TbrText}"       Width="62" />
+          <DataGridTextColumn Header="Protocol"     Binding="{Binding Protocol}"      Width="90" />
+          <DataGridTextColumn Header="Note"         Binding="{Binding Note}"          Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Selection panel -->
+    <Border Grid.Row="2" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="12,10">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: action buttons -->
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal">
+          <Button Content="Set as Video"  Padding="10,4" Margin="0,0,6,0" Command="{Binding SetAsVideoCommand}" />
+          <Button Content="Set as Audio"  Padding="10,4" Margin="0,0,6,0" Command="{Binding SetAsAudioCommand}" />
+          <Button Content="Best Video"    Padding="10,4" Margin="14,0,6,0" Command="{Binding PickBestVideoCommand}" />
+          <Button Content="Best Audio"    Padding="10,4" Margin="0,0,6,0" Command="{Binding PickBestAudioCommand}" />
+          <Button Content="Clear V"       Padding="10,4" Margin="14,0,6,0" Command="{Binding ClearVideoCommand}" />
+          <Button Content="Clear A"       Padding="10,4" Margin="0,0,6,0" Command="{Binding ClearAudioCommand}" />
+        </StackPanel>
+
+        <!-- Row 1: selection summary -->
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Foreground="#555" FontSize="12">
+          <Run Text="Video:" FontWeight="SemiBold" />
+          <Run Text="{Binding SelectedVideo.Id, Mode=OneWay, FallbackValue='—', TargetNullValue='—'}" FontFamily="Consolas, Cascadia Mono" />
+          <Run Text="  Audio:" FontWeight="SemiBold" />
+          <Run Text="{Binding SelectedAudio.Id, Mode=OneWay, FallbackValue='—', TargetNullValue='—'}" FontFamily="Consolas, Cascadia Mono" />
+          <Run Text="  →  -f" FontWeight="SemiBold" />
+          <Run Text="{Binding ComposedSelector, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" Foreground="#1F6FEB" />
+        </TextBlock>
+
+        <!-- Row 2: status / title -->
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,4,0,0" Foreground="#888" FontSize="11"
+                   TextWrapping="Wrap">
+          <Run Text="{Binding StatusText, Mode=OneWay}" />
+          <LineBreak />
+          <Run Text="{Binding VideoTitle, Mode=OneWay, FallbackValue='', TargetNullValue=''}" FontStyle="Italic" />
+        </TextBlock>
+      </Grid>
+    </Border>
+
+    <!-- Bottom action bar -->
+    <Border Grid.Row="3" Background="White" Padding="12,10">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button Content="Cancel" Padding="14,4" MinWidth="84" Command="{Binding CancelCommand}" IsCancel="True" />
+        <Button Content="Apply"  Padding="14,4" MinWidth="84" Margin="8,0,0,0"
+                Command="{Binding ApplyCommand}" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>
