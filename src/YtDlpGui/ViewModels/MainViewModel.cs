@@ -3,8 +3,10 @@ using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using YtDlpGui.Models;
 using YtDlpGui.Services;
+using YtDlpGui.Views;
 
 namespace YtDlpGui.ViewModels;
 
@@ -12,15 +14,27 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly IBinaryResolver _binaries;
     private readonly IDownloadQueue _queue;
+    private readonly ISettingsStore _settings;
+    private readonly IServiceProvider _services;
 
-    public MainViewModel(IBinaryResolver binaries, IDownloadQueue queue, OptionsViewModel options)
+    public MainViewModel(
+        IBinaryResolver binaries,
+        IDownloadQueue queue,
+        OptionsViewModel options,
+        ISettingsStore settings,
+        IServiceProvider services)
     {
         _binaries = binaries;
         _queue = queue;
+        _settings = settings;
+        _services = services;
         Options = options;
 
         YtDlpPath = _binaries.ResolveYtDlp() ?? "(not found — drop yt-dlp.exe next to this app or on PATH)";
-        _parallelism = queue.Parallelism;
+
+        // Apply persisted parallelism before binding the slider.
+        _queue.Parallelism = settings.Current.Parallelism;
+        _parallelism = _queue.Parallelism;
 
         _queue.StatusChanged += OnStatusChanged;
         _queue.ProgressUpdated += OnProgressUpdated;
@@ -98,6 +112,47 @@ public sealed partial class MainViewModel : ObservableObject
             try { System.Diagnostics.Process.Start("explorer.exe", folder); }
             catch { /* not critical */ }
         }
+    }
+
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        var vm = _services.GetRequiredService<SettingsViewModel>();
+        var win = new SettingsWindow(vm) { Owner = Application.Current?.MainWindow };
+        var saved = win.ShowDialog();
+        if (saved == true)
+        {
+            // Path overrides may have changed: refresh the displayed yt-dlp path.
+            YtDlpPath = _binaries.ResolveYtDlp() ?? "(not found — set the path in Settings)";
+            // Pull parallelism back from settings (the dialog may have changed it).
+            Parallelism = _settings.Current.Parallelism;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenInspector()
+    {
+        var vm = _services.GetRequiredService<FormatPickerViewModel>();
+        vm.Url = FirstAvailableUrl();
+        var win = new FormatPickerWindow(vm) { Owner = Application.Current?.MainWindow };
+        var applied = win.ShowDialog();
+        if (applied == true && !string.IsNullOrEmpty(vm.Result))
+        {
+            Options.FormatSelector = vm.Result;
+        }
+    }
+
+    private string FirstAvailableUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(UrlsInput))
+        {
+            var first = UrlsInput
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .FirstOrDefault(s => s.Length > 0);
+            if (!string.IsNullOrEmpty(first)) return first;
+        }
+        return Items.FirstOrDefault()?.Url ?? string.Empty;
     }
 
     partial void OnUrlsInputChanged(string value) => AddToQueueCommand.NotifyCanExecuteChanged();

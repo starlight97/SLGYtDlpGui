@@ -2,7 +2,7 @@
 
 **Owner:** Jeong
 **Target platform:** Windows 10/11 x64
-**Last updated:** 2026-05-01
+**Last updated:** 2026-05-02
 
 ---
 

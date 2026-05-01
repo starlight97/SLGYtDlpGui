@@ -78,6 +78,20 @@
                      VerticalAlignment="Center" Margin="10,0,0,0" />
         </Grid>
 
+        <TextBlock Text="Theme" Style="{StaticResource SectionLabel}" />
+        <ComboBox SelectedValue="{Binding Theme, Mode=TwoWay}" SelectedValuePath="Content" Padding="6,4">
+          <ComboBoxItem Content="System" />
+          <ComboBoxItem Content="Light" />
+          <ComboBoxItem Content="Dark" />
+        </ComboBox>
+
+        <TextBlock Text="yt-dlp.conf" Style="{StaticResource SectionLabel}" />
+        <Button HorizontalAlignment="Left" Padding="10,4"
+                Content="Import from .conf…"
+                Command="{Binding ImportConfCommand}" />
+        <TextBlock Text="One-way import (SPEC §4.1). After import, the GUI fully owns the options; the conf file is not touched again."
+                   Foreground="#888" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap" />
+
         <Border Margin="0,18,0,0" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="0,12,0,0">
           <StackPanel>
             <TextBlock>
@@ -88,9 +102,16 @@
               <Run Text="Settings file:" Foreground="#666" />
               <Run Text="{Binding SettingsFilePath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
             </TextBlock>
-            <Button HorizontalAlignment="Left" Margin="0,8,0,0" Padding="10,4"
-                    Content="Open settings folder"
-                    Command="{Binding OpenSettingsFolderCommand}" />
+            <TextBlock Margin="0,2,0,0">
+              <Run Text="Log folder:" Foreground="#666" />
+              <Run Text="{Binding LogFolderPath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
+            </TextBlock>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Padding="10,4" Content="Open settings folder"
+                      Command="{Binding OpenSettingsFolderCommand}" />
+              <Button Padding="10,4" Margin="6,0,0,0" Content="Open log folder"
+                      Command="{Binding OpenLogFolderCommand}" />
+            </StackPanel>
           </StackPanel>
         </Border>
 

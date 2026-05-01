@@ -19,6 +19,9 @@ public sealed class AppSettings
 
     public int Parallelism { get; set; } = 2;
 
+    /// <summary>"System" | "Light" | "Dark". Drives WPF-UI's theme manager at startup.</summary>
+    public string Theme { get; set; } = "System";
+
     /// <summary>
     /// Last-committed Options panel state. Restored on startup so the user doesn't
     /// re-tick every option each session. Null on first run; OptionsViewModel falls

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.IO;
+using Serilog;
 using YtDlpGui.Infrastructure;
 using YtDlpGui.Infrastructure.Hangul;
 using YtDlpGui.Models;
@@ -48,6 +49,7 @@ public sealed class DownloadQueue : IDownloadQueue, IDisposable
 
     public void Enqueue(DownloadItem item)
     {
+        Log.Information("Enqueue {Url}", item.Url);
         // Fire-and-forget — the queue's lifecycle owns the task; failures are reported via Finished.
         _ = Task.Run(() => RunAsync(item));
     }
@@ -216,6 +218,13 @@ public sealed class DownloadQueue : IDownloadQueue, IDisposable
 
     private void EmitFinal(DownloadItem item, DownloadStatus final, int exitCode, string? reason)
     {
+        var elapsed = (item.FinishedAtUtc ?? DateTime.UtcNow) - (item.StartedAtUtc ?? item.EnqueuedAtUtc);
+        if (final == DownloadStatus.Done)
+            Log.Information("Done {Url} in {Elapsed}", item.Url, elapsed);
+        else
+            Log.Warning("Finished {Url} status={Status} exit={Exit} reason={Reason}",
+                item.Url, final, exitCode, reason ?? "(none)");
+
         StatusChanged?.Invoke(item, final);
         Finished?.Invoke(item, new DownloadFinalResult(final, exitCode, reason));
     }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:YtDlpGui.ViewModels"
         xmlns:models="clr-namespace:YtDlpGui.Models"
-        Title="YtDlpGui v0.2"
+        Title="YtDlpGui v0.4"
         Width="1180" Height="780"
         MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen"
@@ -200,7 +200,31 @@
             Background="White" BorderBrush="#E0E0E0" BorderThickness="1,0,0,0">
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="14,12">
-          <TextBlock Text="Options" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" />
+          <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Options" FontSize="14" FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="Settings…" Padding="10,2"
+                    Command="{Binding OpenSettingsCommand}" />
+          </Grid>
+
+          <TextBlock Text="Profile" Style="{StaticResource OptionLabel}" />
+          <ComboBox ItemsSource="{Binding Options.Profiles}"
+                    SelectedItem="{Binding Options.CurrentProfile, Mode=TwoWay}"
+                    DisplayMemberPath="."
+                    Padding="6,4" />
+          <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+            <Button Content="Save"      Padding="10,2" Margin="0,0,4,0"
+                    Command="{Binding Options.SaveProfileCommand}"
+                    ToolTip="Overwrite the selected user profile with the current options."/>
+            <Button Content="Save as…"  Padding="10,2" Margin="0,0,4,0"
+                    Command="{Binding Options.SaveAsProfileCommand}" />
+            <Button Content="Delete"    Padding="10,2"
+                    Command="{Binding Options.DeleteProfileCommand}" />
+          </StackPanel>
 
           <TextBlock Text="yt-dlp" Style="{StaticResource OptionLabel}" />
           <TextBox Text="{Binding YtDlpPath}" IsReadOnly="True" Padding="6,4" Background="#FAFAFA" />
@@ -212,8 +236,16 @@
           <TextBox Text="{Binding Options.OutputTemplate, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
 
           <TextBlock Text="Format selector (-f)" Style="{StaticResource OptionLabel}" />
-          <TextBox Text="{Binding Options.FormatSelector, UpdateSourceTrigger=PropertyChanged}"
-                   Padding="6,4" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Text="{Binding Options.FormatSelector, UpdateSourceTrigger=PropertyChanged}"
+                     Padding="6,4" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
+            <Button Grid.Column="1" Content="Inspect…" Padding="10,4" Margin="6,0,0,0"
+                    Command="{Binding OpenInspectorCommand}" />
+          </Grid>
 
           <TextBlock Text="Merge format" Style="{StaticResource OptionLabel}" />
           <ComboBox SelectedValue="{Binding Options.MergeOutputFormat, Mode=TwoWay}"
