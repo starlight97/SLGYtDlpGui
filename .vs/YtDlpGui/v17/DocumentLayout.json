@@ -1,0 +1,121 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Jeong\\SLG-yt-dlp\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|c:\\users\\jeong\\slg-yt-dlp\\src\\ytdlpgui\\services\\binaryresolver.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|solutionrelative:src\\ytdlpgui\\services\\binaryresolver.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|c:\\users\\jeong\\slg-yt-dlp\\src\\ytdlpgui\\services\\ibinaryresolver.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|solutionrelative:src\\ytdlpgui\\services\\ibinaryresolver.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|c:\\users\\jeong\\slg-yt-dlp\\src\\ytdlpgui\\services\\iytdlprunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|solutionrelative:src\\ytdlpgui\\services\\iytdlprunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|c:\\users\\jeong\\slg-yt-dlp\\src\\ytdlpgui\\services\\ytdlprunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|solutionrelative:src\\ytdlpgui\\services\\ytdlprunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|c:\\users\\jeong\\slg-yt-dlp\\src\\ytdlpgui\\views\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|solutionrelative:src\\ytdlpgui\\views\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|c:\\users\\jeong\\slg-yt-dlp\\src\\ytdlpgui\\infrastructure\\hangul\\nfcnormalizer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{1D5B7E7D-7E36-4B5F-9E5D-9C7B7D2C9D11}|src\\YtDlpGui\\YtDlpGui.csproj|solutionrelative:src\\ytdlpgui\\infrastructure\\hangul\\nfcnormalizer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "BinaryResolver.cs",
+              "DocumentMoniker": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\BinaryResolver.cs",
+              "RelativeDocumentMoniker": "src\\YtDlpGui\\Services\\BinaryResolver.cs",
+              "ToolTip": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\BinaryResolver.cs",
+              "RelativeToolTip": "src\\YtDlpGui\\Services\\BinaryResolver.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-01T13:55:04.201Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "IBinaryResolver.cs",
+              "DocumentMoniker": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\IBinaryResolver.cs",
+              "RelativeDocumentMoniker": "src\\YtDlpGui\\Services\\IBinaryResolver.cs",
+              "ToolTip": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\IBinaryResolver.cs",
+              "RelativeToolTip": "src\\YtDlpGui\\Services\\IBinaryResolver.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAsAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-01T13:50:40.245Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "IYtDlpRunner.cs",
+              "DocumentMoniker": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\IYtDlpRunner.cs",
+              "RelativeDocumentMoniker": "src\\YtDlpGui\\Services\\IYtDlpRunner.cs",
+              "ToolTip": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\IYtDlpRunner.cs",
+              "RelativeToolTip": "src\\YtDlpGui\\Services\\IYtDlpRunner.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-01T13:50:34.207Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "YtDlpRunner.cs",
+              "DocumentMoniker": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\YtDlpRunner.cs",
+              "RelativeDocumentMoniker": "src\\YtDlpGui\\Services\\YtDlpRunner.cs",
+              "ToolTip": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Services\\YtDlpRunner.cs",
+              "RelativeToolTip": "src\\YtDlpGui\\Services\\YtDlpRunner.cs",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAAB4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-01T13:50:23.315Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Views\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "src\\YtDlpGui\\Views\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Views\\MainWindow.xaml",
+              "RelativeToolTip": "src\\YtDlpGui\\Views\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-05-01T13:49:58.496Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "NfcNormalizer.cs",
+              "DocumentMoniker": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Infrastructure\\Hangul\\NfcNormalizer.cs",
+              "RelativeDocumentMoniker": "src\\YtDlpGui\\Infrastructure\\Hangul\\NfcNormalizer.cs",
+              "ToolTip": "C:\\Users\\Jeong\\SLG-yt-dlp\\src\\YtDlpGui\\Infrastructure\\Hangul\\NfcNormalizer.cs",
+              "RelativeToolTip": "src\\YtDlpGui\\Infrastructure\\Hangul\\NfcNormalizer.cs",
+              "ViewState": "AgIAABkAAAAAAAAAAAAAwA8AAAASAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-01T13:49:45.552Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
