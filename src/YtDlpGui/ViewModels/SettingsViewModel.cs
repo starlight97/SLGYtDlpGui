@@ -31,8 +31,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         var s = store.Current;
         _ytDlpPathOverride = s.YtDlpPathOverride;
         _ffmpegPathOverride = s.FfmpegPathOverride;
+        // Show the persisted setting if any, otherwise mirror what the Options
+        // panel currently has so the user isn't faced with a surprise default.
         _defaultOutputFolder = string.IsNullOrEmpty(s.DefaultOutputFolder)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
+            ? options.OutputFolder
             : s.DefaultOutputFolder;
         _parallelism = s.Parallelism;
         _theme = string.IsNullOrEmpty(s.Theme) ? "System" : s.Theme;
@@ -135,10 +137,17 @@ public sealed partial class SettingsViewModel : ObservableObject
         var s = _store.Current;
         s.YtDlpPathOverride = (YtDlpPathOverride ?? string.Empty).Trim();
         s.FfmpegPathOverride = (FfmpegPathOverride ?? string.Empty).Trim();
-        s.DefaultOutputFolder = (DefaultOutputFolder ?? string.Empty).Trim();
+        var folder = (DefaultOutputFolder ?? string.Empty).Trim();
+        s.DefaultOutputFolder = folder;
         s.Parallelism = Math.Clamp(Parallelism, 1, 32);
         s.Theme = string.IsNullOrEmpty(Theme) ? "System" : Theme;
         _store.Save();
+
+        // Push to the live Options panel so the change takes effect immediately
+        // and the next "Add to queue" uses it. (LastOptions persistence on exit
+        // will then capture this in the per-session record too.)
+        if (!string.IsNullOrEmpty(folder)) _options.OutputFolder = folder;
+
         DialogResult = true;
         RequestClose?.Invoke();
     }

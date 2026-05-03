@@ -32,10 +32,16 @@ public sealed partial class OptionsViewModel : ObservableObject
         RefreshProfiles();
 
         var saved = settings.Current.LastOptions;
+
+        // OutputFolder precedence: explicit Settings.OutputFolder beats the
+        // saved per-session value, which beats the ~/Downloads fallback. This
+        // makes the Settings dialog authoritative — once the user sets it
+        // there, it survives across restarts even if a stray earlier session
+        // left LastOptions.OutputFolder pointing somewhere else.
+        OutputFolder = ResolveOutputFolder(settings, saved);
+
         if (saved is not null)
         {
-            // Restore last-committed Options panel state (v0.3 single-profile stand-in).
-            OutputFolder = string.IsNullOrEmpty(saved.OutputFolder) ? FallbackFolder(settings) : saved.OutputFolder;
             OutputTemplate = string.IsNullOrEmpty(saved.OutputTemplate) ? "%(title)s.%(ext)s" : saved.OutputTemplate;
             NfcNormalize = saved.NfcNormalize;
             FormatSelector = string.IsNullOrEmpty(saved.FormatSelector) ? _formatSelector : saved.FormatSelector;
@@ -49,16 +55,14 @@ public sealed partial class OptionsViewModel : ObservableObject
             Verbose = saved.Verbose;
             ExtraArgs = saved.ExtraArgs;
         }
-        else
-        {
-            OutputFolder = FallbackFolder(settings);
-        }
     }
 
-    private static string FallbackFolder(ISettingsStore settings)
+    private static string ResolveOutputFolder(ISettingsStore settings, DownloadOptions? saved)
     {
         if (!string.IsNullOrWhiteSpace(settings.Current.DefaultOutputFolder))
             return settings.Current.DefaultOutputFolder;
+        if (!string.IsNullOrWhiteSpace(saved?.OutputFolder))
+            return saved!.OutputFolder;
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             "Downloads");
