@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -21,13 +23,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly ISettingsStore _store;
     private readonly IConfImporter _importer;
     private readonly OptionsViewModel _options;
+    private readonly IBinaryResolver _binaries;
+    private readonly IYtDlpRunner _runner;
     private readonly string _originalTheme;
 
-    public SettingsViewModel(ISettingsStore store, IConfImporter importer, OptionsViewModel options)
+    public SettingsViewModel(
+        ISettingsStore store,
+        IConfImporter importer,
+        OptionsViewModel options,
+        IBinaryResolver binaries,
+        IYtDlpRunner runner)
     {
         _store = store;
         _importer = importer;
         _options = options;
+        _binaries = binaries;
+        _runner = runner;
         var s = store.Current;
         _ytDlpPathOverride = s.YtDlpPathOverride;
         _ffmpegPathOverride = s.FfmpegPathOverride;
@@ -55,6 +66,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string SettingsFilePath { get; }
     public string LogFolderPath { get; }
     public string AppVersion { get; }
+
+    [ObservableProperty] private string _ytDlpVersion = "(click Check)";
+    [ObservableProperty] private string _ffmpegVersion = "(click Check)";
+    [ObservableProperty] private bool _isUpdatingYtDlp;
+    [ObservableProperty] private string _selfUpdateStatus = string.Empty;
+
+    partial void OnIsUpdatingYtDlpChanged(bool value)
+        => SelfUpdateYtDlpCommand.NotifyCanExecuteChanged();
 
     [ObservableProperty] private string _ytDlpPathOverride;
     [ObservableProperty] private string _ffmpegPathOverride;
@@ -128,6 +147,98 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (summary.ShowDialog() == true)
         {
             _options.ApplyOptions(result.Options);
+        }
+    }
+
+    /// <summary>SPEC §5.6: query <c>yt-dlp --version</c> and <c>ffmpeg -version</c> for the About panel.</summary>
+    [RelayCommand]
+    private async Task CheckVersionsAsync()
+    {
+        YtDlpVersion = "(checking…)";
+        FfmpegVersion = "(checking…)";
+
+        var ytDlp = _binaries.ResolveYtDlp();
+        YtDlpVersion = ytDlp is null
+            ? "(not found)"
+            : await GetExeVersionAsync(ytDlp, new[] { "--version" }).ConfigureAwait(true);
+
+        var ffmpeg = _binaries.ResolveFfmpeg();
+        FfmpegVersion = ffmpeg is null
+            ? "(not found)"
+            : await GetExeVersionAsync(ffmpeg, new[] { "-version" }).ConfigureAwait(true);
+    }
+
+    private bool CanSelfUpdate() => !IsUpdatingYtDlp;
+
+    /// <summary>SPEC §5.6: in-place upgrade via <c>yt-dlp -U</c>.</summary>
+    [RelayCommand(CanExecute = nameof(CanSelfUpdate))]
+    private async Task SelfUpdateYtDlpAsync()
+    {
+        var ytDlp = _binaries.ResolveYtDlp();
+        if (ytDlp is null)
+        {
+            SelfUpdateStatus = "yt-dlp.exe not found.";
+            return;
+        }
+
+        IsUpdatingYtDlp = true;
+        SelfUpdateStatusUpdate("Running yt-dlp -U…");
+        try
+        {
+            var sb = new StringBuilder();
+            var result = await _runner.RunAsync(
+                ytDlp,
+                new[] { "-U", "--no-color" },
+                workingDirectory: null,
+                onLine: line => sb.AppendLine(line),
+                ct: CancellationToken.None).ConfigureAwait(true);
+
+            var output = sb.ToString().Trim();
+            SelfUpdateStatus = result.ExitCode == 0 && !result.SawErrorPrefix
+                ? $"Done.\n{output}"
+                : $"Failed (exit {result.ExitCode}).\n{output}";
+        }
+        catch (Exception ex)
+        {
+            SelfUpdateStatus = $"Failed: {ex.Message}";
+        }
+        finally
+        {
+            IsUpdatingYtDlp = false;
+        }
+    }
+
+    private void SelfUpdateStatusUpdate(string s) => SelfUpdateStatus = s;
+
+    private static async Task<string> GetExeVersionAsync(string exePath, string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+            };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            using var proc = Process.Start(psi);
+            if (proc is null) return "(launch failed)";
+
+            var stdout = await proc.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+            var stderr = await proc.StandardError.ReadToEndAsync().ConfigureAwait(false);
+            await proc.WaitForExitAsync().ConfigureAwait(false);
+
+            // ffmpeg writes its banner to stderr; yt-dlp writes the version to stdout.
+            var combined = string.IsNullOrWhiteSpace(stdout) ? stderr : stdout;
+            var firstLine = combined.Split('\n').FirstOrDefault()?.Trim();
+            return string.IsNullOrEmpty(firstLine) ? "(empty)" : firstLine!;
+        }
+        catch (Exception ex)
+        {
+            return $"(error: {ex.Message})";
         }
     }
 

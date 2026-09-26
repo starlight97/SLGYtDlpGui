@@ -8,19 +8,19 @@
         ShowInTaskbar="False"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
-  <Grid Background="#F5F5F5">
+  <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <StackPanel Grid.Row="0" Margin="14,12">
-      <TextBlock x:Name="PromptLabel" Text="Name:" Foreground="#444"
+      <TextBlock x:Name="PromptLabel" Text="Name:" Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                  FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6" />
       <TextBox x:Name="ValueBox" Padding="6,4" />
     </StackPanel>
 
-    <Border Grid.Row="1" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="14,10">
+    <Border Grid.Row="1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="14,10">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button Content="Cancel" Padding="14,4" MinWidth="84" IsCancel="True" Click="Cancel_Click" />
         <Button Content="OK" Padding="14,4" MinWidth="84" Margin="8,0,0,0" IsDefault="True" Click="Ok_Click" />

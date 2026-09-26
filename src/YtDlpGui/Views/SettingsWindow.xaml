@@ -12,13 +12,13 @@
   <Window.Resources>
     <Style x:Key="SectionLabel" TargetType="TextBlock">
       <Setter Property="Margin" Value="0,12,0,4" />
-      <Setter Property="Foreground" Value="#444" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="FontSize" Value="11" />
     </Style>
   </Window.Resources>
 
-  <Grid Background="#F5F5F5">
+  <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
@@ -38,7 +38,7 @@
                   Command="{Binding BrowseYtDlpCommand}" />
         </Grid>
         <TextBlock Text="Empty = auto-detect (next to app, repo root, or PATH)."
-                   Foreground="#888" FontSize="10" Margin="0,2,0,0" />
+                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10" Margin="0,2,0,0" />
 
         <TextBlock Text="ffmpeg.exe path (override)" Style="{StaticResource SectionLabel}" />
         <Grid>
@@ -51,7 +51,7 @@
                   Command="{Binding BrowseFfmpegCommand}" />
         </Grid>
         <TextBlock Text="Empty = auto-detect."
-                   Foreground="#888" FontSize="10" Margin="0,2,0,0" />
+                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10" Margin="0,2,0,0" />
 
         <TextBlock Text="Output folder" Style="{StaticResource SectionLabel}" />
         <Grid>
@@ -64,7 +64,7 @@
                   Command="{Binding BrowseDefaultOutputFolderCommand}" />
         </Grid>
         <TextBlock Text="Authoritative — saved here applies to the Options panel and survives across restarts. Per-session edits in the Options panel are temporary."
-                   Foreground="#888" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap" />
+                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap" />
 
         <TextBlock Text="Default parallelism" Style="{StaticResource SectionLabel}" />
         <Grid>
@@ -90,20 +90,40 @@
                 Content="Import from .conf…"
                 Command="{Binding ImportConfCommand}" />
         <TextBlock Text="One-way import (SPEC §4.1). After import, the GUI fully owns the options; the conf file is not touched again."
-                   Foreground="#888" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap" />
+                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap" />
 
-        <Border Margin="0,18,0,0" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+        <Border Margin="0,18,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
           <StackPanel>
+            <TextBlock Text="About" Style="{StaticResource SectionLabel}" Margin="0,0,0,4" />
             <TextBlock>
-              <Run Text="App version:" Foreground="#666" />
+              <Run Text="App version:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <Run Text="{Binding AppVersion, Mode=OneWay}" />
             </TextBlock>
-            <TextBlock Margin="0,4,0,0">
-              <Run Text="Settings file:" Foreground="#666" />
+            <TextBlock Margin="0,2,0,0">
+              <Run Text="yt-dlp:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <Run Text="{Binding YtDlpVersion, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
+            </TextBlock>
+            <TextBlock Margin="0,2,0,0">
+              <Run Text="ffmpeg:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <Run Text="{Binding FfmpegVersion, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
+            </TextBlock>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Padding="10,4" Content="Check versions"
+                      Command="{Binding CheckVersionsCommand}" />
+              <Button Padding="10,4" Margin="6,0,0,0" Content="Update yt-dlp (-U)"
+                      Command="{Binding SelfUpdateYtDlpCommand}" />
+            </StackPanel>
+            <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       FontSize="11" FontFamily="Consolas, Cascadia Mono"
+                       TextWrapping="Wrap"
+                       Text="{Binding SelfUpdateStatus, Mode=OneWay}" />
+
+            <TextBlock Margin="0,12,0,0">
+              <Run Text="Settings file:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <Run Text="{Binding SettingsFilePath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
             </TextBlock>
             <TextBlock Margin="0,2,0,0">
-              <Run Text="Log folder:" Foreground="#666" />
+              <Run Text="Log folder:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <Run Text="{Binding LogFolderPath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
             </TextBlock>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
@@ -118,7 +138,7 @@
       </StackPanel>
     </ScrollViewer>
 
-    <Border Grid.Row="1" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="14,10">
+    <Border Grid.Row="1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="14,10">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button Content="Cancel" Padding="14,4" MinWidth="84" Command="{Binding CancelCommand}" IsCancel="True" />
         <Button Content="Save" Padding="14,4" MinWidth="84" Margin="8,0,0,0"

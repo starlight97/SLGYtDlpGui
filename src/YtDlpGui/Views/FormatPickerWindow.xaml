@@ -8,7 +8,7 @@
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
-  <Grid Background="#F5F5F5">
+  <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -17,7 +17,7 @@
     </Grid.RowDefinitions>
 
     <!-- URL bar -->
-    <Border Grid.Row="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="12,10">
+    <Border Grid.Row="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="12,10">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
@@ -33,7 +33,7 @@
     </Border>
 
     <!-- Formats grid -->
-    <Border Grid.Row="1" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+    <Border Grid.Row="1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
       <DataGrid ItemsSource="{Binding Formats}"
                 SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
                 AutoGenerateColumns="False"
@@ -42,7 +42,7 @@
                 IsReadOnly="True"
                 HeadersVisibility="Column"
                 GridLinesVisibility="Horizontal"
-                AlternatingRowBackground="#FAFAFA"
+                AlternatingRowBackground="{DynamicResource SubtleFillColorTertiaryBrush}"
                 FontSize="12">
         <DataGrid.Columns>
           <DataGridTextColumn Header="ID"           Binding="{Binding Id}"            Width="60"  FontFamily="Consolas, Cascadia Mono" />
@@ -60,7 +60,7 @@
     </Border>
 
     <!-- Selection panel -->
-    <Border Grid.Row="2" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="12,10">
+    <Border Grid.Row="2" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="12,10">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
@@ -83,17 +83,17 @@
         </StackPanel>
 
         <!-- Row 1: selection summary -->
-        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Foreground="#555" FontSize="12">
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12">
           <Run Text="Video:" FontWeight="SemiBold" />
           <Run Text="{Binding SelectedVideo.Id, Mode=OneWay, FallbackValue='—', TargetNullValue='—'}" FontFamily="Consolas, Cascadia Mono" />
           <Run Text="  Audio:" FontWeight="SemiBold" />
           <Run Text="{Binding SelectedAudio.Id, Mode=OneWay, FallbackValue='—', TargetNullValue='—'}" FontFamily="Consolas, Cascadia Mono" />
           <Run Text="  →  -f" FontWeight="SemiBold" />
-          <Run Text="{Binding ComposedSelector, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" Foreground="#1F6FEB" />
+          <Run Text="{Binding ComposedSelector, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
         </TextBlock>
 
         <!-- Row 2: status / title -->
-        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,4,0,0" Foreground="#888" FontSize="11"
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,4,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="11"
                    TextWrapping="Wrap">
           <Run Text="{Binding StatusText, Mode=OneWay}" />
           <LineBreak />
@@ -103,7 +103,7 @@
     </Border>
 
     <!-- Bottom action bar -->
-    <Border Grid.Row="3" Background="White" Padding="12,10">
+    <Border Grid.Row="3" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" Padding="12,10">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button Content="Cancel" Padding="14,4" MinWidth="84" Command="{Binding CancelCommand}" IsCancel="True" />
         <Button Content="Apply"  Padding="14,4" MinWidth="84" Margin="8,0,0,0"

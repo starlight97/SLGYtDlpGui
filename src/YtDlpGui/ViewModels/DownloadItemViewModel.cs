@@ -27,6 +27,8 @@ public sealed partial class DownloadItemViewModel : ObservableObject
 
     public Guid Id => _item.Id;
     public string OutputFolder => _item.Options.OutputFolder;
+    /// <summary>Underlying model — exposed so MainViewModel.RetryItem can clone Url+Options.</summary>
+    public DownloadItem Item => _item;
 
     [ObservableProperty] private string _url;
     [ObservableProperty] private DownloadStatus _status;
@@ -51,11 +53,40 @@ public sealed partial class DownloadItemViewModel : ObservableObject
     [RelayCommand]
     private void OpenContainingFolder()
     {
+        // Prefer the actual file (Explorer selects it) when we know the path; fall
+        // back to opening the folder.
+        var finalPath = _item.FinalFilePath;
+        if (!string.IsNullOrEmpty(finalPath) && File.Exists(finalPath))
+        {
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{finalPath}\""); }
+            catch { /* not critical */ }
+            return;
+        }
         if (Directory.Exists(OutputFolder))
         {
             try { System.Diagnostics.Process.Start("explorer.exe", OutputFolder); }
             catch { /* not critical */ }
         }
+    }
+
+    [RelayCommand]
+    private void OpenFile()
+    {
+        var finalPath = _item.FinalFilePath;
+        if (!string.IsNullOrEmpty(finalPath) && File.Exists(finalPath))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(finalPath)
+                {
+                    UseShellExecute = true,
+                });
+            }
+            catch { /* not critical */ }
+            return;
+        }
+        // No known path — fall back to opening the folder so the user can pick.
+        OpenContainingFolder();
     }
 
     [RelayCommand]

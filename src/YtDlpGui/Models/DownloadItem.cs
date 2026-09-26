@@ -14,4 +14,11 @@ public sealed class DownloadItem
     public DateTime EnqueuedAtUtc { get; } = DateTime.UtcNow;
     public DateTime? StartedAtUtc { get; set; }
     public DateTime? FinishedAtUtc { get; set; }
+
+    /// <summary>
+    /// The final file path captured from yt-dlp's <c>--print after_move:</c> hook.
+    /// Set just before completion; null if the run failed before the move stage.
+    /// Consumed by <c>DownloadItemViewModel.OpenFile</c>.
+    /// </summary>
+    public string? FinalFilePath { get; set; }
 }

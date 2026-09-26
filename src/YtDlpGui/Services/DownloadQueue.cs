@@ -146,6 +146,16 @@ public sealed class DownloadQueue : IDownloadQueue, IDisposable
                 return;
             }
 
+            // FILEPATH: → capture the resolved final-on-disk path for "Open file".
+            // Single line at end of run; don't echo to per-item log (it's redundant
+            // with the [download] Destination lines that ARE echoed).
+            if (line.StartsWith(ArgBuilder.FilePathPrefix, StringComparison.Ordinal))
+            {
+                var path = line[ArgBuilder.FilePathPrefix.Length..].Trim();
+                if (path.Length > 0) item.FinalFilePath = path;
+                return;
+            }
+
             // Stage tag → status transition (forward-only: don't slip back to Resolving once Downloading).
             var inferred = ProgressParser.TryInferStatus(line);
             if (inferred is DownloadStatus s && (int)s > (int)lastStatus)

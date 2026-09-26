@@ -15,6 +15,9 @@ public static class ArgBuilder
     public const string ProgressTemplate =
         "PROGRESS:%(progress._percent_str)s|%(progress._downloaded_bytes)s|%(progress._total_bytes)s|%(progress._speed)s|%(progress._eta_seconds)s|%(progress.fragment_index)s|%(progress.fragment_count)s";
 
+    /// <summary>Tag used by the GUI to capture the final on-disk file path via <c>--print after_move</c>.</summary>
+    public const string FilePathPrefix = "FILEPATH:";
+
     public static string[] Build(DownloadOptions o, string url)
     {
         var args = new List<string>(32);
@@ -26,6 +29,11 @@ public static class ArgBuilder
         args.Add("--no-progress");
         args.Add("--progress-template");
         args.Add(ProgressTemplate);
+
+        // GUI-side: capture the final on-disk path so DownloadItemViewModel.OpenFile
+        // can hand the user the actual file rather than just the folder.
+        args.Add("--print");
+        args.Add($"after_move:{FilePathPrefix}%(filepath)s");
 
         AppendOutput(args, o);
         AppendFormat(args, o);

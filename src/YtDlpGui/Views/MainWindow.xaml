@@ -15,7 +15,7 @@
 
     <Style x:Key="OptionLabel" TargetType="TextBlock">
       <Setter Property="Margin" Value="0,8,0,2" />
-      <Setter Property="Foreground" Value="#444" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="FontSize" Value="11" />
     </Style>
@@ -38,7 +38,7 @@
     </Style>
 
     <DataTemplate x:Key="ItemRowTemplate" DataType="{x:Type vm:DownloadItemViewModel}">
-      <Border BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="10,8" Background="White">
+      <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="10,8" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -79,7 +79,8 @@
                   </Style.Triggers>
                 </Style>
               </Border.Style>
-              <TextBlock Text="{Binding StatusText}" FontSize="11" />
+              <!-- Badge bg colors are pastel; force dark text so it stays readable in dark theme too. -->
+              <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="#222" />
             </Border>
 
             <TextBlock Grid.Column="1" Text="{Binding Url}" Margin="10,0,8,0"
@@ -87,17 +88,26 @@
                        ToolTip="{Binding Url}" />
 
             <TextBlock Grid.Column="2" Text="{Binding PercentText}" MinWidth="50"
-                       VerticalAlignment="Center" Margin="6,0" Foreground="#333" />
+                       VerticalAlignment="Center" Margin="6,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
             <TextBlock Grid.Column="3" Text="{Binding SpeedText}" MinWidth="80"
-                       VerticalAlignment="Center" Margin="6,0" Foreground="#666" />
+                       VerticalAlignment="Center" Margin="6,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             <TextBlock Grid.Column="4" Text="{Binding EtaText}" MinWidth="50"
-                       VerticalAlignment="Center" Margin="6,0" Foreground="#666" />
+                       VerticalAlignment="Center" Margin="6,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
             <StackPanel Grid.Column="5" Orientation="Horizontal" Margin="6,0,0,0">
               <ToggleButton Content="Log" Padding="8,2" Margin="0,0,4,0"
                             IsChecked="{Binding IsExpanded, Mode=TwoWay}" />
               <Button Content="Cancel" Padding="8,2" Margin="0,0,4,0"
                       Command="{Binding CancelCommand}" />
+              <Button Content="Retry" Padding="8,2" Margin="0,0,4,0"
+                      ToolTip="Re-queue with same URL + options"
+                      IsEnabled="{Binding CanRemove}"
+                      Command="{Binding DataContext.RetryItemCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                      CommandParameter="{Binding}" />
+              <Button Content="Open" Padding="8,2" Margin="0,0,4,0"
+                      ToolTip="Open the downloaded file (falls back to folder)"
+                      Command="{Binding OpenFileCommand}" />
               <Button Content="Folder" Padding="8,2" Margin="0,0,4,0"
                       Command="{Binding OpenContainingFolderCommand}" />
               <Button Content="Copy URL" Padding="8,2" Margin="0,0,4,0"
@@ -114,7 +124,8 @@
           <!-- Progress bar -->
           <ProgressBar Grid.Row="1" Margin="0,6,0,0" Height="4"
                        Minimum="0" Maximum="100" Value="{Binding Percent, Mode=OneWay}"
-                       Background="#EEE" Foreground="#3B82F6" />
+                       Background="{DynamicResource ControlStrokeColorDefaultBrush}"
+                       Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
 
           <!-- Log (collapsible) -->
           <TextBox Grid.Row="2" Style="{StaticResource MonoTextBox}"
@@ -127,7 +138,7 @@
     </DataTemplate>
   </Window.Resources>
 
-  <Grid Background="#F5F5F5">
+  <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*" />
       <ColumnDefinition Width="340" />
@@ -138,27 +149,50 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <!-- URL input bar -->
-    <Border Grid.Row="0" Grid.Column="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="12,10">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <TextBox Grid.Column="0"
-                 Text="{Binding UrlsInput, UpdateSourceTrigger=PropertyChanged}"
-                 AcceptsReturn="True"
-                 Height="64"
-                 VerticalScrollBarVisibility="Auto"
-                 TextWrapping="NoWrap" />
-        <Button Grid.Column="1" Content="Add to queue"
-                Padding="14,0" MinWidth="120" Margin="8,0,0,0"
-                Command="{Binding AddToQueueCommand}" />
-      </Grid>
+    <!-- URL input bar (with optional clipboard auto-detect banner above the box) -->
+    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="12,10">
+      <StackPanel>
+        <!-- SPEC §5.1: clipboard auto-detect banner. -->
+        <Border Visibility="{Binding HasClipboardCandidates, Converter={StaticResource BoolToVis}}"
+                Background="#FFF6D6" BorderBrush="#E0CC7A" BorderThickness="1"
+                CornerRadius="3" Padding="10,6" Margin="0,0,0,8">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="{Binding ClipboardBannerText}"
+                       Foreground="#5C4500" VerticalAlignment="Center" FontSize="12" />
+            <Button Grid.Column="1" Content="Add" Padding="10,2" Margin="6,0,0,0"
+                    Command="{Binding AddClipboardCommand}" />
+            <Button Grid.Column="2" Content="✕" Padding="8,2" Margin="4,0,0,0"
+                    ToolTip="Dismiss"
+                    Command="{Binding DismissClipboardCommand}" />
+          </Grid>
+        </Border>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBox Grid.Column="0"
+                   Text="{Binding UrlsInput, UpdateSourceTrigger=PropertyChanged}"
+                   AcceptsReturn="True"
+                   AllowDrop="True"
+                   Height="64"
+                   VerticalScrollBarVisibility="Auto"
+                   TextWrapping="NoWrap" />
+          <Button Grid.Column="1" Content="Add to queue"
+                  Padding="14,0" MinWidth="120" Margin="8,0,0,0"
+                  Command="{Binding AddToQueueCommand}" />
+        </Grid>
+      </StackPanel>
     </Border>
 
     <!-- Queue -->
-    <Border Grid.Row="1" Grid.Column="0" Background="White" Margin="0,0,0,0">
+    <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,0,0">
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <ItemsControl ItemsSource="{Binding Items}"
                       ItemTemplate="{StaticResource ItemRowTemplate}" />
@@ -166,9 +200,10 @@
     </Border>
 
     <!-- Bottom action / status bar -->
-    <Border Grid.Row="2" Grid.Column="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="12,8">
+    <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="12,8">
       <Grid>
         <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
@@ -178,16 +213,18 @@
 
         <Button Grid.Column="0" Content="Cancel All" Padding="12,4"
                 Command="{Binding CancelAllCommand}" />
-        <Button Grid.Column="1" Content="Clear Done" Padding="12,4" Margin="6,0,0,0"
+        <Button Grid.Column="1" Content="Retry failed" Padding="12,4" Margin="6,0,0,0"
+                Command="{Binding RetryFailedCommand}" />
+        <Button Grid.Column="2" Content="Clear Done" Padding="12,4" Margin="6,0,0,0"
                 Command="{Binding ClearDoneCommand}" />
-        <Button Grid.Column="2" Content="Open Output" Padding="12,4" Margin="6,0,0,0"
+        <Button Grid.Column="3" Content="Open Output" Padding="12,4" Margin="6,0,0,0"
                 Command="{Binding OpenOutputFolderCommand}" />
 
-        <TextBlock Grid.Column="3" Text="{Binding StatusText}" Foreground="#666"
-                   VerticalAlignment="Center" Margin="16,0,0,0" />
+        <TextBlock Grid.Column="4" Text="{Binding StatusText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis" />
 
-        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
-          <TextBlock Text="Parallel:" Foreground="#666" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock Text="Parallel:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
           <Slider Minimum="1" Maximum="8" Width="120" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding Parallelism, Mode=TwoWay}" VerticalAlignment="Center" />
           <TextBlock Text="{Binding Parallelism}" MinWidth="20" Margin="6,0,0,0" VerticalAlignment="Center" />
@@ -197,7 +234,7 @@
 
     <!-- Options panel -->
     <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
-            Background="White" BorderBrush="#E0E0E0" BorderThickness="1,0,0,0">
+            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1,0,0,0">
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="14,12">
           <Grid Margin="0,0,0,8">
@@ -227,43 +264,102 @@
           </StackPanel>
 
           <TextBlock Text="yt-dlp" Style="{StaticResource OptionLabel}" />
-          <TextBox Text="{Binding YtDlpPath}" IsReadOnly="True" Padding="6,4" Background="#FAFAFA" />
+          <TextBox Text="{Binding YtDlpPath}" IsReadOnly="True" Padding="6,4" Background="{DynamicResource ControlFillColorTertiaryBrush}" />
 
+          <!-- ======================== OUTPUT ======================== -->
           <TextBlock Text="Output folder" Style="{StaticResource OptionLabel}" />
-          <TextBox Text="{Binding Options.OutputFolder, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Text="{Binding Options.OutputFolder, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
+            <Button Grid.Column="1" Content="…" Padding="10,4" Margin="4,0,0,0" MinWidth="36"
+                    Command="{Binding Options.BrowseOutputFolderCommand}"
+                    ToolTip="Browse for folder" />
+          </Grid>
 
           <TextBlock Text="Output template" Style="{StaticResource OptionLabel}" />
-          <TextBox Text="{Binding Options.OutputTemplate, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
+          <TextBox Text="{Binding Options.OutputTemplate, UpdateSourceTrigger=PropertyChanged}"
+                   Padding="6,4" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
 
+          <TextBlock Text="Filename" Style="{StaticResource OptionLabel}" />
+          <CheckBox Content="NFC normalize Hangul"   IsChecked="{Binding Options.NfcNormalize}"      Margin="0,2" />
+          <CheckBox Content="Restrict filenames"     IsChecked="{Binding Options.RestrictFilenames}" Margin="0,2"
+                    ToolTip="--restrict-filenames" />
+          <CheckBox Content="Windows-safe filenames" IsChecked="{Binding Options.WindowsFilenames}"  Margin="0,2"
+                    ToolTip="--windows-filenames" />
+
+          <!-- ======================== FORMAT ======================== -->
           <TextBlock Text="Format selector (-f)" Style="{StaticResource OptionLabel}" />
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0" Text="{Binding Options.FormatSelector, UpdateSourceTrigger=PropertyChanged}"
                      Padding="6,4" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
             <Button Grid.Column="1" Content="Inspect…" Padding="10,4" Margin="6,0,0,0"
                     Command="{Binding OpenInspectorCommand}" />
+            <Button Grid.Column="2" Content="Validate" Padding="10,4" Margin="4,0,0,0"
+                    ToolTip="Run yt-dlp --simulate against the first URL (SPEC §13)"
+                    Command="{Binding ValidateFormatCommand}" />
           </Grid>
 
           <TextBlock Text="Merge format" Style="{StaticResource OptionLabel}" />
           <ComboBox SelectedValue="{Binding Options.MergeOutputFormat, Mode=TwoWay}"
-                    SelectedValuePath="Content">
-            <ComboBoxItem Content="mp4" />
-            <ComboBoxItem Content="mkv" />
-            <ComboBoxItem Content="webm" />
-            <ComboBoxItem Content="" /> <!-- auto -->
+                    SelectedValuePath="Tag">
+            <ComboBoxItem Content="mp4"    Tag="mp4" />
+            <ComboBoxItem Content="mkv"    Tag="mkv" />
+            <ComboBoxItem Content="webm"   Tag="webm" />
+            <ComboBoxItem Content="(auto)" Tag="" />
           </ComboBox>
 
+          <!-- ======================== EMBED / WRITE ======================== -->
           <TextBlock Text="Embed" Style="{StaticResource OptionLabel}" />
-          <CheckBox Content="Metadata" IsChecked="{Binding Options.EmbedMetadata}" Margin="0,2" />
+          <CheckBox Content="Metadata"  IsChecked="{Binding Options.EmbedMetadata}"  Margin="0,2" />
           <CheckBox Content="Thumbnail" IsChecked="{Binding Options.EmbedThumbnail}" Margin="0,2" />
-          <CheckBox Content="Chapters" IsChecked="{Binding Options.EmbedChapters}" Margin="0,2" />
+          <CheckBox Content="Chapters"  IsChecked="{Binding Options.EmbedChapters}"  Margin="0,2" />
 
-          <TextBlock Text="Filename" Style="{StaticResource OptionLabel}" />
-          <CheckBox Content="NFC normalize Hangul" IsChecked="{Binding Options.NfcNormalize}" Margin="0,2" />
+          <TextBlock Text="Write sidecar files" Style="{StaticResource OptionLabel}" />
+          <CheckBox Content="Description (.description)" IsChecked="{Binding Options.WriteDescription}" Margin="0,2"
+                    ToolTip="--write-description" />
+          <CheckBox Content="Info JSON (.info.json)"     IsChecked="{Binding Options.WriteInfoJson}"    Margin="0,2"
+                    ToolTip="--write-info-json" />
 
+          <!-- ======================== SUBTITLES ======================== -->
+          <TextBlock Text="Subtitles" Style="{StaticResource OptionLabel}" />
+          <CheckBox Content="Write subs"                 IsChecked="{Binding Options.WriteSubs}"     Margin="0,2"
+                    ToolTip="--write-subs" />
+          <CheckBox Content="Write auto-generated subs"  IsChecked="{Binding Options.WriteAutoSubs}" Margin="0,2"
+                    ToolTip="--write-auto-subs" />
+          <CheckBox Content="Embed subs in video"        IsChecked="{Binding Options.EmbedSubs}"     Margin="0,2"
+                    ToolTip="--embed-subs" />
+
+          <Grid Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="100" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+              <TextBlock Text="Languages (comma-separated)" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Options.SubLangs, UpdateSourceTrigger=PropertyChanged}"
+                       Padding="6,4" FontSize="11"
+                       ToolTip="--sub-langs (e.g. ko,en,en.*)" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+              <TextBlock Text="Convert to" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <ComboBox SelectedValue="{Binding Options.ConvertSubsTo, Mode=TwoWay}"
+                        SelectedValuePath="Tag">
+                <ComboBoxItem Content="(none)" Tag="" />
+                <ComboBoxItem Content="srt"    Tag="srt" />
+                <ComboBoxItem Content="vtt"    Tag="vtt" />
+              </ComboBox>
+            </StackPanel>
+          </Grid>
+
+          <!-- ======================== AUDIO EXTRACTION ======================== -->
           <TextBlock Text="Audio extraction" Style="{StaticResource OptionLabel}" />
           <CheckBox x:Name="ExtractAudioToggle" Content="Extract audio (-x)"
                     IsChecked="{Binding Options.ExtractAudio}" Margin="0,2" />
@@ -273,7 +369,7 @@
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Margin="0,0,4,0">
-              <TextBlock Text="Codec" FontSize="11" Foreground="#666" />
+              <TextBlock Text="Codec" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <ComboBox SelectedValue="{Binding Options.AudioCodec, Mode=TwoWay}" SelectedValuePath="Content">
                 <ComboBoxItem Content="mp3" />
                 <ComboBoxItem Content="m4a" />
@@ -285,20 +381,108 @@
               </ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="4,0,0,0">
-              <TextBlock Text="Quality (0-9 / kbps)" FontSize="11" Foreground="#666" />
+              <TextBlock Text="Quality (0-9 / kbps)" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <TextBox Text="{Binding Options.AudioQuality, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
             </StackPanel>
           </Grid>
+          <CheckBox Content="Keep original video file (-k)"
+                    IsChecked="{Binding Options.KeepVideo}"
+                    IsEnabled="{Binding IsChecked, ElementName=ExtractAudioToggle}"
+                    Margin="0,4,0,0" />
 
+          <!-- ======================== NETWORK / AUTH ======================== -->
+          <TextBlock Text="Cookies (from browser)" Style="{StaticResource OptionLabel}" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ComboBox Grid.Column="0" Margin="0,0,4,0" IsEditable="True" Padding="6,4"
+                      Text="{Binding Options.CookiesFromBrowser, UpdateSourceTrigger=LostFocus}"
+                      ToolTip="--cookies-from-browser">
+              <ComboBoxItem Content="" />
+              <ComboBoxItem Content="chrome" />
+              <ComboBoxItem Content="firefox" />
+              <ComboBoxItem Content="edge" />
+              <ComboBoxItem Content="brave" />
+              <ComboBoxItem Content="opera" />
+              <ComboBoxItem Content="vivaldi" />
+              <ComboBoxItem Content="safari" />
+            </ComboBox>
+            <TextBox Grid.Column="1" Margin="4,0,0,0" Padding="6,4"
+                     Text="{Binding Options.CookiesBrowserProfile, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Optional browser profile name (e.g. 'Default')" />
+          </Grid>
+
+          <TextBlock Text="Cookies file" Style="{StaticResource OptionLabel}" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Text="{Binding Options.CookiesFile, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
+            <Button Grid.Column="1" Content="…" Padding="10,4" Margin="4,0,0,0" MinWidth="36"
+                    Command="{Binding Options.BrowseCookiesFileCommand}" />
+          </Grid>
+
+          <TextBlock Text="Proxy" Style="{StaticResource OptionLabel}" />
+          <TextBox Text="{Binding Options.Proxy, UpdateSourceTrigger=PropertyChanged}" Padding="6,4"
+                   ToolTip="--proxy (e.g. http://localhost:8080 or socks5://...)" />
+
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+              <TextBlock Text="Rate limit" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Options.RateLimit, UpdateSourceTrigger=PropertyChanged}" Padding="6,4"
+                       ToolTip="e.g. 5M, 500K — empty for no limit" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+              <TextBlock Text="Retries" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Options.Retries, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
+                       Padding="6,4" ToolTip="--retries" />
+            </StackPanel>
+          </Grid>
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+              <TextBlock Text="Concurrent fragments" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Options.ConcurrentFragments, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
+                       Padding="6,4" ToolTip="-N / --concurrent-fragments" />
+            </StackPanel>
+          </Grid>
+
+          <!-- ======================== PLAYLIST ======================== -->
+          <TextBlock Text="Playlist" Style="{StaticResource OptionLabel}" />
+          <CheckBox Content="Download playlist (3-state)" IsThreeState="True"
+                    IsChecked="{Binding Options.DownloadPlaylist, Mode=TwoWay}" Margin="0,2"
+                    ToolTip="✓ --yes-playlist  ☐ --no-playlist  ‒ yt-dlp default" />
+
+          <TextBlock Text="Items (e.g. 1-5,8)" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,6,0,2" />
+          <TextBox Text="{Binding Options.PlaylistItems, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" />
+
+          <CheckBox Content="Reverse order" IsChecked="{Binding Options.PlaylistReverse}" Margin="0,4,0,2" />
+          <CheckBox Content="Random order"  IsChecked="{Binding Options.PlaylistRandom}"  Margin="0,2" />
+
+          <!-- ======================== MISC ======================== -->
           <TextBlock Text="Misc" Style="{StaticResource OptionLabel}" />
-          <CheckBox Content="Verbose (-v)" IsChecked="{Binding Options.Verbose}" Margin="0,2" />
+          <CheckBox Content="Force overwrites" IsChecked="{Binding Options.ForceOverwrites}" Margin="0,2"
+                    ToolTip="--force-overwrites" />
+          <CheckBox Content="Continue partial" IsChecked="{Binding Options.ContinuePartial}" Margin="0,2"
+                    ToolTip="--continue (default ON)" />
+          <CheckBox Content="Verbose (-v)"     IsChecked="{Binding Options.Verbose}"        Margin="0,2" />
 
           <TextBlock Text="Extra args (free-form)" Style="{StaticResource OptionLabel}" />
           <TextBox Text="{Binding Options.ExtraArgs, UpdateSourceTrigger=PropertyChanged}"
                    Padding="6,4" FontFamily="Consolas, Cascadia Mono" FontSize="11"
                    AcceptsReturn="False" TextWrapping="Wrap" />
 
-          <TextBlock Margin="0,16,0,0" Foreground="#888" FontSize="10"
+          <TextBlock Margin="0,16,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10"
                      TextWrapping="Wrap"
                      Text="Options snapshot is taken at 'Add to queue'; later edits don't affect in-flight items." />
         </StackPanel>
