@@ -31,6 +31,7 @@ public partial class App : Application
         services.AddSingleton<IFormatInspector, FormatInspector>();
         services.AddSingleton<IConfImporter, ConfImporter>();
         services.AddSingleton<IDownloadQueue, DownloadQueue>();
+        services.AddSingleton<YtDlpUpdater>();
 
         services.AddSingleton<OptionsViewModel>();
         services.AddSingleton<MainViewModel>();

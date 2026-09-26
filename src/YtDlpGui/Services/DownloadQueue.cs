@@ -127,7 +127,9 @@ public sealed class DownloadQueue : IDownloadQueue, IDisposable
             return;
         }
 
-        var args = ArgBuilder.Build(item.Options, item.Url);
+        // null = not found anywhere; omit the flag and let yt-dlp fall back to its own lookup.
+        var ffmpegPath = _binaries.ResolveFfmpeg();
+        var args = ArgBuilder.Build(item.Options, item.Url, ffmpegPath);
 
         // §13: log argv on line 1 of the per-item log.
         LogLine?.Invoke(item, ArgBuilder.FormatForLog(ytDlpPath, args));

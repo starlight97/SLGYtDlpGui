@@ -18,7 +18,9 @@ public static class ArgBuilder
     /// <summary>Tag used by the GUI to capture the final on-disk file path via <c>--print after_move</c>.</summary>
     public const string FilePathPrefix = "FILEPATH:";
 
-    public static string[] Build(DownloadOptions o, string url)
+    private static readonly char[] ExtraArgSeparators = { ' ', '\t', '\r', '\n' };
+
+    public static string[] Build(DownloadOptions o, string url, string? ffmpegPath = null)
     {
         var args = new List<string>(32);
 
@@ -35,6 +37,7 @@ public static class ArgBuilder
         args.Add("--print");
         args.Add($"after_move:{FilePathPrefix}%(filepath)s");
 
+        AppendFfmpegLocation(args, o, ffmpegPath);
         AppendOutput(args, o);
         AppendFormat(args, o);
         AppendContainer(args, o);
@@ -47,6 +50,24 @@ public static class ArgBuilder
         // URL last so any preceding flag is unambiguous.
         args.Add(url);
         return args.ToArray();
+    }
+
+    private static void AppendFfmpegLocation(List<string> args, DownloadOptions o, string? ffmpegPath)
+    {
+        // GUI-resolved ffmpeg (Settings override → side-by-side → PATH). Extra args win:
+        // if the user already passes --ffmpeg-location there, don't emit a second one.
+        if (string.IsNullOrWhiteSpace(ffmpegPath)) return;
+        if (HasExtraArg(o.ExtraArgs, "--ffmpeg-location")) return;
+        args.Add("--ffmpeg-location");
+        args.Add(ffmpegPath);
+    }
+
+    private static bool HasExtraArg(string? extraArgs, string option)
+    {
+        if (string.IsNullOrWhiteSpace(extraArgs)) return false;
+        foreach (var tok in extraArgs.Split(ExtraArgSeparators, StringSplitOptions.RemoveEmptyEntries))
+            if (tok == option || tok.StartsWith(option + "=", StringComparison.Ordinal)) return true;
+        return false;
     }
 
     private static void AppendOutput(List<string> args, DownloadOptions o)
@@ -186,7 +207,7 @@ public static class ArgBuilder
         {
             // Free-form: split on whitespace. The user is responsible for not using
             // spaces inside an arg here — that's what the bound options are for.
-            foreach (var tok in o.ExtraArgs.Split(' ', '\t', '\r', '\n'))
+            foreach (var tok in o.ExtraArgs.Split(ExtraArgSeparators))
             {
                 if (!string.IsNullOrWhiteSpace(tok)) args.Add(tok);
             }

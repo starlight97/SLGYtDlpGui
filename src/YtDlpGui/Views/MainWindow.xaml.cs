@@ -10,8 +10,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Loaded += OnLoaded;
         Activated += OnActivated;
         Closing += OnClosing;
+    }
+
+    /// <summary>Background yt-dlp age check once the window is up (never blocks first paint).</summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) _ = vm.CheckYtDlpVersionAsync();
     }
 
     // Auto-scroll the per-item log to the bottom whenever new output arrives.
@@ -30,6 +37,24 @@ public partial class MainWindow : Window
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
+
+        if (vm.IsUpdatingYtDlp)
+        {
+            var updateResult = MessageBox.Show(
+                this,
+                "A yt-dlp update (-U) is still running. Closing now may interrupt it before the " +
+                "result is logged, and could leave yt-dlp.exe in a bad state. Exit anyway?",
+                "yt-dlp update in progress",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (updateResult != MessageBoxResult.Yes)
+            {
+                e.Cancel = true;
+                return;
+            }
+        }
+
         if (!vm.HasActiveDownloads) return;
 
         var n = vm.ActiveCount;

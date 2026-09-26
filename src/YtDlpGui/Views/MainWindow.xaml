@@ -152,6 +152,29 @@
     <!-- URL input bar (with optional clipboard auto-detect banner above the box) -->
     <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="12,10">
       <StackPanel>
+        <!-- Outdated yt-dlp banner (startup version check / yt-dlp's own 90-day warning). -->
+        <Border Visibility="{Binding HasOutdatedYtDlp, Converter={StaticResource BoolToVis}}"
+                Background="#FDE3D3" BorderBrush="#E49A6C" BorderThickness="1"
+                CornerRadius="3" Padding="10,6" Margin="0,0,0,8">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding YtDlpBannerText}" Foreground="#6A2C00" FontSize="12" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding YtDlpBannerDetail}" Foreground="#6A2C00" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                         Visibility="{Binding HasYtDlpBannerDetail, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="Update" Padding="10,2" Margin="6,0,0,0" VerticalAlignment="Center"
+                    ToolTip="Run yt-dlp -U (unavailable while downloads are active)" ToolTipService.ShowOnDisabled="True"
+                    Command="{Binding UpdateYtDlpCommand}" />
+            <Button Grid.Column="2" Content="✕" Padding="8,2" Margin="4,0,0,0" VerticalAlignment="Center"
+                    ToolTip="Dismiss for this session" Command="{Binding DismissYtDlpBannerCommand}" />
+          </Grid>
+        </Border>
+
         <!-- SPEC §5.1: clipboard auto-detect banner. -->
         <Border Visibility="{Binding HasClipboardCandidates, Converter={StaticResource BoolToVis}}"
                 Background="#FFF6D6" BorderBrush="#E0CC7A" BorderThickness="1"

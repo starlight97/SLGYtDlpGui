@@ -6,6 +6,8 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
+using YtDlpGui.Infrastructure;
 using YtDlpGui.Models;
 using YtDlpGui.Services;
 using YtDlpGui.Views;
@@ -21,8 +23,18 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IYtDlpRunner _runner;
     private readonly ISettingsStore _settings;
     private readonly IServiceProvider _services;
+    private readonly YtDlpUpdater _ytDlpUpdater;
 
     private List<string> _clipboardCandidates = new();
+
+    // --- Outdated yt-dlp banner bookkeeping ---
+    private string? _outdatedYtDlpVersion;   // version the banner currently describes
+    private string? _dismissedYtDlpVersion;  // [x] hides the banner for this version for the session
+    private int _versionCheckSeq;            // UI-thread only; drops stale results when checks overlap
+
+    // True while Validate (--simulate) or the Format Inspector dialog has a yt-dlp.exe process of
+    // its own running — a "yt-dlp -U" self-replace must never race against either one.
+    private bool _isRunningAdhocYtDlp;
 
     public MainViewModel(
         IBinaryResolver binaries,
@@ -30,13 +42,15 @@ public sealed partial class MainViewModel : ObservableObject
         IYtDlpRunner runner,
         OptionsViewModel options,
         ISettingsStore settings,
-        IServiceProvider services)
+        IServiceProvider services,
+        YtDlpUpdater ytDlpUpdater)
     {
         _binaries = binaries;
         _queue = queue;
         _runner = runner;
         _settings = settings;
         _services = services;
+        _ytDlpUpdater = ytDlpUpdater;
         Options = options;
 
         YtDlpPath = _binaries.ResolveYtDlp() ?? "(not found — drop yt-dlp.exe next to this app or on PATH)";
@@ -64,11 +78,28 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _hasClipboardCandidates;
     [ObservableProperty] private string _clipboardBannerText = string.Empty;
 
+    // --- Outdated yt-dlp banner ---
+    [ObservableProperty] private bool _hasOutdatedYtDlp;
+    [ObservableProperty] private string _ytDlpBannerText = string.Empty;
+    [ObservableProperty] private string _ytDlpBannerDetail = string.Empty;
+    [ObservableProperty] private bool _isUpdatingYtDlp;
+
+    public bool HasYtDlpBannerDetail => !string.IsNullOrEmpty(YtDlpBannerDetail);
+    partial void OnYtDlpBannerDetailChanged(string value) => OnPropertyChanged(nameof(HasYtDlpBannerDetail));
+
+    partial void OnIsUpdatingYtDlpChanged(bool value)
+    {
+        UpdateYtDlpCommand.NotifyCanExecuteChanged();
+        DismissYtDlpBannerCommand.NotifyCanExecuteChanged();
+        AddToQueueCommand.NotifyCanExecuteChanged();
+        OpenSettingsCommand.NotifyCanExecuteChanged();
+    }
+
     /// <summary>True if any item in the queue is still in flight. Evaluated on demand (not bound).</summary>
     public bool HasActiveDownloads => Items.Any(v => !v.IsTerminal);
     public int ActiveCount => Items.Count(v => !v.IsTerminal);
 
-    private bool CanAdd() => !string.IsNullOrWhiteSpace(UrlsInput);
+    private bool CanAdd() => !string.IsNullOrWhiteSpace(UrlsInput) && !IsUpdatingYtDlp;
 
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void AddToQueue()
@@ -114,13 +145,15 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void RetryItem(DownloadItemViewModel? vm)
     {
-        if (vm is null || !vm.IsTerminal) return;
+        if (vm is null || !vm.IsTerminal || IsUpdatingYtDlp) return;
         EnqueueOne(vm.Item.Url, vm.Item.Options);
     }
 
     [RelayCommand]
     private void RetryFailed()
     {
+        if (IsUpdatingYtDlp) { StatusText = "Wait for the yt-dlp update to finish."; return; }
+
         // Snapshot Items first; EnqueueOne mutates the collection.
         var failed = Items.Where(v => v.Status is DownloadStatus.Failed or DownloadStatus.Canceled).ToList();
         foreach (var v in failed) EnqueueOne(v.Item.Url, v.Item.Options);
@@ -138,7 +171,9 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool CanOpenSettings() => !IsUpdatingYtDlp;
+
+    [RelayCommand(CanExecute = nameof(CanOpenSettings))]
     private void OpenSettings()
     {
         var vm = _services.GetRequiredService<SettingsViewModel>();
@@ -149,18 +184,36 @@ public sealed partial class MainViewModel : ObservableObject
             YtDlpPath = _binaries.ResolveYtDlp() ?? "(not found — set the path in Settings)";
             Parallelism = _settings.Current.Parallelism;
         }
+        // Re-check regardless of Save/Cancel: the path override or a Settings-driven -U
+        // may have changed what's on disk either way.
+        _ = CheckYtDlpVersionAsync();
     }
 
     [RelayCommand]
     private void OpenInspector()
     {
+        if (IsUpdatingYtDlp) { StatusText = "Wait for the yt-dlp update to finish."; return; }
+
         var vm = _services.GetRequiredService<FormatPickerViewModel>();
         vm.Url = FirstAvailableUrl();
         var win = new FormatPickerWindow(vm) { Owner = Application.Current?.MainWindow };
-        var applied = win.ShowDialog();
-        if (applied == true && !string.IsNullOrEmpty(vm.Result))
+
+        // The dialog can (re-)run yt-dlp -F for as long as it's open — keep the Update button
+        // disabled for its whole lifetime, not just around a single inspect call.
+        _isRunningAdhocYtDlp = true;
+        UpdateYtDlpCommand.NotifyCanExecuteChanged();
+        try
         {
-            Options.FormatSelector = vm.Result;
+            var applied = win.ShowDialog();
+            if (applied == true && !string.IsNullOrEmpty(vm.Result))
+            {
+                Options.FormatSelector = vm.Result;
+            }
+        }
+        finally
+        {
+            _isRunningAdhocYtDlp = false;
+            UpdateYtDlpCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -171,6 +224,8 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ValidateFormatAsync()
     {
+        if (IsUpdatingYtDlp) { StatusText = "Validate: wait for the yt-dlp update to finish."; return; }
+
         var url = FirstAvailableUrl();
         if (string.IsNullOrWhiteSpace(url))
         {
@@ -191,6 +246,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         StatusText = "Validating…";
+        _isRunningAdhocYtDlp = true;
+        UpdateYtDlpCommand.NotifyCanExecuteChanged();
         try
         {
             var sb = new StringBuilder();
@@ -217,6 +274,11 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusText = $"Validate: failed ({ex.Message})";
+        }
+        finally
+        {
+            _isRunningAdhocYtDlp = false;
+            UpdateYtDlpCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -277,6 +339,152 @@ public sealed partial class MainViewModel : ObservableObject
         ClipboardBannerText = string.Empty;
     }
 
+    // --- Outdated yt-dlp banner ---
+
+    /// <summary>Called from MainWindow.Loaded (startup) and after Settings closes.</summary>
+    public async Task CheckYtDlpVersionAsync()
+    {
+        try
+        {
+            if (IsUpdatingYtDlp) return;
+
+            var seq = ++_versionCheckSeq;
+            var check = await Task.Run(() => _ytDlpUpdater.CheckVersionAsync(CancellationToken.None)).ConfigureAwait(true);
+
+            if (seq != _versionCheckSeq || IsUpdatingYtDlp) return; // superseded by a newer check
+
+            if (check.Version is null || check.ReleaseDate is not DateOnly releaseDate)
+            {
+                // Path not found or output unparseable — nothing new to show.
+                HideYtDlpBanner();
+                return;
+            }
+
+            if (!YtDlpVersionParser.IsOutdated(releaseDate, Today()))
+            {
+                HideYtDlpBanner();
+            }
+            else
+            {
+                ShowYtDlpBanner(check.Version, YtDlpVersionParser.AgeInDays(releaseDate, Today()));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "yt-dlp version check failed");
+        }
+    }
+
+    private bool CanUpdateYtDlp() => !IsUpdatingYtDlp && !HasActiveDownloads && !_isRunningAdhocYtDlp;
+
+    [RelayCommand(CanExecute = nameof(CanUpdateYtDlp))]
+    private async Task UpdateYtDlpAsync()
+    {
+        if (HasActiveDownloads)
+        {
+            YtDlpBannerDetail = "Finish or cancel active downloads before updating.";
+            return;
+        }
+
+        IsUpdatingYtDlp = true;
+        YtDlpBannerDetail = "Running yt-dlp -U…";
+        StatusText = "Updating yt-dlp…";
+        try
+        {
+            var r = await Task.Run(() => _ytDlpUpdater.SelfUpdateAsync(CancellationToken.None)).ConfigureAwait(true);
+            if (!r.Success)
+            {
+                YtDlpBannerDetail = "Update failed: " + Truncate(r.Message, 300);
+                StatusText = "yt-dlp update failed.";
+                return;
+            }
+
+            // Invalidate any check that might still be in flight, then re-probe.
+            _versionCheckSeq++;
+            var check = await Task.Run(() => _ytDlpUpdater.CheckVersionAsync(CancellationToken.None)).ConfigureAwait(true);
+
+            if (check.Version is null || check.ReleaseDate is not DateOnly releaseDate)
+            {
+                // -U reported success, but the post-update probe couldn't confirm a version
+                // (transient lock/I-O right after the self-replace, path override change, …).
+                // Don't claim success and don't touch whatever banner state was already showing.
+                YtDlpBannerDetail = $"yt-dlp -U ran, but the new version could not be confirmed: {Truncate(r.Message, 300)}";
+                StatusText = "yt-dlp -U ran; version unconfirmed.";
+            }
+            else if (YtDlpVersionParser.IsOutdated(releaseDate, Today()))
+            {
+                ShowYtDlpBanner(check.Version, YtDlpVersionParser.AgeInDays(releaseDate, Today()));
+                YtDlpBannerDetail = $"yt-dlp -U didn't install a newer build: {Truncate(r.Message, 300)}";
+            }
+            else
+            {
+                HideYtDlpBanner();
+                StatusText = $"yt-dlp updated to {check.Version}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            // AsyncRelayCommand re-throws unhandled exceptions on the UI context, and this app
+            // has no DispatcherUnhandledException handler — this catch must not be removed.
+            Log.Warning(ex, "yt-dlp -U update flow failed unexpectedly");
+            YtDlpBannerDetail = $"Update failed: {ex.Message}";
+            StatusText = "yt-dlp update failed.";
+        }
+        finally
+        {
+            IsUpdatingYtDlp = false;
+        }
+    }
+
+    private bool CanDismissYtDlpBanner() => !IsUpdatingYtDlp;
+
+    [RelayCommand(CanExecute = nameof(CanDismissYtDlpBanner))]
+    private void DismissYtDlpBanner()
+    {
+        _dismissedYtDlpVersion = _outdatedYtDlpVersion;
+        HideYtDlpBanner();
+    }
+
+    private void ShowYtDlpBanner(string version, int? ageDays)
+    {
+        if (string.Equals(version, _dismissedYtDlpVersion, StringComparison.Ordinal)) return;
+
+        // Don't clobber an existing failure detail (e.g. from a just-failed update) when we're
+        // simply re-confirming the same outdated version is still showing — but do clear it as
+        // soon as the version being described actually changes (e.g. a different override path).
+        if (!HasOutdatedYtDlp || !string.Equals(version, _outdatedYtDlpVersion, StringComparison.Ordinal))
+            YtDlpBannerDetail = string.Empty;
+
+        _outdatedYtDlpVersion = version;
+        YtDlpBannerText = ageDays is int age
+            ? $"yt-dlp {version} is {age} days old — YouTube downloads may fail (e.g. HTTP 403)."
+            : $"yt-dlp {version} is older than {YtDlpVersionParser.OutdatedAfterDays} days — YouTube downloads may fail (e.g. HTTP 403).";
+
+        if (!HasOutdatedYtDlp) Log.Information("Outdated yt-dlp banner shown: {Version}", version);
+        HasOutdatedYtDlp = true;
+    }
+
+    private void HideYtDlpBanner()
+    {
+        HasOutdatedYtDlp = false;
+        _outdatedYtDlpVersion = null;
+        YtDlpBannerText = string.Empty;
+        YtDlpBannerDetail = string.Empty;
+    }
+
+    /// <summary>Fallback: yt-dlp's own "is older than 90 days" warning line, seen during a download.</summary>
+    private void ReportOutdatedWarning(string version)
+    {
+        if (HasOutdatedYtDlp || IsUpdatingYtDlp) return;
+
+        var age = YtDlpVersionParser.TryParse(version, out _, out var releaseDate)
+            ? YtDlpVersionParser.AgeInDays(releaseDate, Today())
+            : (int?)null;
+        ShowYtDlpBanner(version, age);
+    }
+
+    private static DateOnly Today() => DateOnly.FromDateTime(DateTime.Now);
+
     // --- helpers ---
 
     private void EnqueueOne(string url, DownloadOptions options)
@@ -285,6 +493,7 @@ public sealed partial class MainViewModel : ObservableObject
         var vm = new DownloadItemViewModel(item, _queue);
         Items.Add(vm);
         _queue.Enqueue(item);
+        UpdateYtDlpCommand.NotifyCanExecuteChanged();
     }
 
     private string FirstAvailableUrl()
@@ -311,7 +520,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnStatusChanged(DownloadItem item, DownloadStatus status)
     {
-        Application.Current?.Dispatcher.BeginInvoke(() => FindVm(item)?.ApplyStatus(status));
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            FindVm(item)?.ApplyStatus(status);
+            UpdateYtDlpCommand.NotifyCanExecuteChanged();
+        });
     }
 
     private void OnProgressUpdated(DownloadItem item, ProgressSnapshot snap)
@@ -321,7 +534,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnLogLine(DownloadItem item, string line)
     {
-        Application.Current?.Dispatcher.BeginInvoke(() => FindVm(item)?.OnLogLine(line));
+        // Fallback detection for the F1 banner: yt-dlp's own "is older than 90 days" warning.
+        // Cheap Contains() check off the UI thread; only regex-matches when it might hit.
+        var outdated = YtDlpVersionParser.TryParseOutdatedWarning(line, out var v) ? v : null;
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            FindVm(item)?.OnLogLine(line);
+            if (outdated is not null) ReportOutdatedWarning(outdated);
+        });
     }
 
     private void OnFinished(DownloadItem item, DownloadFinalResult result)
