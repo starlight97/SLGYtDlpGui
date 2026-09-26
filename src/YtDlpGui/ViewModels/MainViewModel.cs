@@ -24,6 +24,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ISettingsStore _settings;
     private readonly IServiceProvider _services;
     private readonly YtDlpUpdater _ytDlpUpdater;
+    private readonly IAppUpdateService _appUpdates;
 
     private List<string> _clipboardCandidates = new();
 
@@ -36,6 +37,11 @@ public sealed partial class MainViewModel : ObservableObject
     // its own running — a "yt-dlp -U" self-replace must never race against either one.
     private bool _isRunningAdhocYtDlp;
 
+    // --- App self-update banner bookkeeping ---
+    private bool _startupUpdateCheckStarted;
+    private bool _appUpdateBannerDismissed;
+    private bool _appUpdateBannerEngaged;   // true once the user clicked the banner's action button
+
     public MainViewModel(
         IBinaryResolver binaries,
         IDownloadQueue queue,
@@ -43,7 +49,8 @@ public sealed partial class MainViewModel : ObservableObject
         OptionsViewModel options,
         ISettingsStore settings,
         IServiceProvider services,
-        YtDlpUpdater ytDlpUpdater)
+        YtDlpUpdater ytDlpUpdater,
+        IAppUpdateService appUpdates)
     {
         _binaries = binaries;
         _queue = queue;
@@ -51,9 +58,11 @@ public sealed partial class MainViewModel : ObservableObject
         _settings = settings;
         _services = services;
         _ytDlpUpdater = ytDlpUpdater;
+        _appUpdates = appUpdates;
         Options = options;
 
-        YtDlpPath = _binaries.ResolveYtDlp() ?? "(not found — drop yt-dlp.exe next to this app or on PATH)";
+        YtDlpPath = _binaries.ResolveYtDlp()
+            ?? "(not found — put yt-dlp.exe in the tools folder (Settings > About) or on PATH)";
 
         _queue.Parallelism = settings.Current.Parallelism;
         _parallelism = _queue.Parallelism;
@@ -62,10 +71,22 @@ public sealed partial class MainViewModel : ObservableObject
         _queue.ProgressUpdated += OnProgressUpdated;
         _queue.LogLine += OnLogLine;
         _queue.Finished += OnFinished;
+
+        _appUpdates.StatusChanged += OnAppUpdateStatusChanged;
+        // A package downloaded in an earlier session (ReadyToRestart) must show up immediately.
+        ApplyAppUpdateBanner(_appUpdates.Status);
+
+        // YtDlpUpdater.IsUpdating is a singleton flag also flipped by the transient SettingsViewModel's
+        // Self Update button — this VM (itself a singleton, so no matching unsubscribe) must re-query
+        // UpdateYtDlpCommand when that happens, not just when its own IsUpdatingYtDlp changes.
+        _ytDlpUpdater.IsUpdatingChanged += OnYtDlpUpdaterIsUpdatingChanged;
     }
 
     public OptionsViewModel Options { get; }
     public ObservableCollection<DownloadItemViewModel> Items { get; } = new();
+
+    /// <summary>Bound to MainWindow.Title. Same assembly-version source as SettingsViewModel.AppVersion (ToString(3)).</summary>
+    public string WindowTitle { get; } = $"YtDlpGui v{typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?"}";
 
     [ObservableProperty] private string _ytDlpPath;
     [ObservableProperty] private string _urlsInput = string.Empty;
@@ -93,7 +114,26 @@ public sealed partial class MainViewModel : ObservableObject
         DismissYtDlpBannerCommand.NotifyCanExecuteChanged();
         AddToQueueCommand.NotifyCanExecuteChanged();
         OpenSettingsCommand.NotifyCanExecuteChanged();
+        UpdateAppCommand.NotifyCanExecuteChanged();
     }
+
+    // --- App self-update banner (Velopack / GitHub Releases) ---
+    [ObservableProperty] private bool _hasAppUpdateBanner;
+    [ObservableProperty] private string _appUpdateBannerText = string.Empty;
+    [ObservableProperty] private string _appUpdateBannerActionText = "Update & restart";
+    [ObservableProperty] private int _appUpdateBannerProgress;
+    [ObservableProperty] private bool _isAppUpdateBannerDownloading;
+    [ObservableProperty] private bool _showAppUpdateBannerAction;
+
+    /// <summary>True once "Restart to update"/banner scheduled the post-exit hand-off; read by MainWindow.OnClosing.</summary>
+    public bool IsRestartingToUpdate => _appUpdates.IsApplyScheduled;
+
+    /// <summary>
+    /// True while a yt-dlp -U is in flight, whether it was started from this VM or from
+    /// SettingsViewModel (a transient VM whose own IsUpdatingYtDlp never reaches this singleton).
+    /// Read by MainWindow.OnClosing so the "yt-dlp update in progress" warning covers both paths.
+    /// </summary>
+    public bool IsYtDlpSelfUpdateActive => IsUpdatingYtDlp || _ytDlpUpdater.IsUpdating;
 
     /// <summary>True if any item in the queue is still in flight. Evaluated on demand (not bound).</summary>
     public bool HasActiveDownloads => Items.Any(v => !v.IsTerminal);
@@ -181,7 +221,8 @@ public sealed partial class MainViewModel : ObservableObject
         var saved = win.ShowDialog();
         if (saved == true)
         {
-            YtDlpPath = _binaries.ResolveYtDlp() ?? "(not found — set the path in Settings)";
+            YtDlpPath = _binaries.ResolveYtDlp()
+                ?? "(not found — put yt-dlp.exe in the tools folder (Settings > About) or on PATH)";
             Parallelism = _settings.Current.Parallelism;
         }
         // Re-check regardless of Save/Cancel: the path override or a Settings-driven -U
@@ -375,7 +416,14 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private bool CanUpdateYtDlp() => !IsUpdatingYtDlp && !HasActiveDownloads && !_isRunningAdhocYtDlp;
+    // A yt-dlp -U self-replace must never race an app-update download/apply: block it while the app
+    // update is downloading (Velopack writes into the install folder) or a restart-to-apply is
+    // scheduled/in progress (Velopack force-kills every process under the install root on apply).
+    // _ytDlpUpdater.IsUpdating also covers a -U started from the transient SettingsViewModel, which
+    // has no IsUpdatingYtDlp of its own reflected here.
+    private bool CanUpdateYtDlp() => !IsUpdatingYtDlp && !HasActiveDownloads && !_isRunningAdhocYtDlp
+        && !_ytDlpUpdater.IsUpdating
+        && _appUpdates.Status.State != AppUpdateState.Downloading && !_appUpdates.IsApplyScheduled;
 
     [RelayCommand(CanExecute = nameof(CanUpdateYtDlp))]
     private async Task UpdateYtDlpAsync()
@@ -484,6 +532,103 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private static DateOnly Today() => DateOnly.FromDateTime(DateTime.Now);
+
+    // --- App self-update banner (Velopack) ---
+
+    /// <summary>Called from MainWindow.OnLoaded next to CheckYtDlpVersionAsync; never blocks first paint.</summary>
+    public async Task CheckAppUpdateInBackgroundAsync()
+    {
+        if (_startupUpdateCheckStarted || !_appUpdates.IsInstalled) return;   // dev/F5: no network call
+        _startupUpdateCheckStarted = true;
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false); // let first paint + yt-dlp probe go first
+            await _appUpdates.CheckAsync().ConfigureAwait(false);           // banner driven by StatusChanged
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Background app update check failed");
+        }
+    }
+
+    private void OnAppUpdateStatusChanged(AppUpdateStatus _)
+        => Application.Current?.Dispatcher.BeginInvoke(() => ApplyAppUpdateBanner(_appUpdates.Status));
+
+    private void ApplyAppUpdateBanner(AppUpdateStatus s)
+    {
+        AppUpdateBannerProgress = s.Progress;
+        IsAppUpdateBannerDownloading = s.State == AppUpdateState.Downloading;
+        ShowAppUpdateBannerAction = s.State is AppUpdateState.Available or AppUpdateState.ReadyToRestart;
+
+        AppUpdateBannerText = s.State switch
+        {
+            AppUpdateState.Available or AppUpdateState.Downloading => $"YtDlpGui {s.AvailableVersion} is available.",
+            AppUpdateState.ReadyToRestart => $"YtDlpGui {s.AvailableVersion} is ready.",
+            AppUpdateState.Failed => "App update failed — see Settings > About",
+            _ => AppUpdateBannerText,
+        };
+        AppUpdateBannerActionText = s.State == AppUpdateState.ReadyToRestart ? "Restart now" : "Update & restart";
+
+        HasAppUpdateBanner = !_appUpdateBannerDismissed && s.State switch
+        {
+            AppUpdateState.Available or AppUpdateState.Downloading or AppUpdateState.ReadyToRestart => true,
+            AppUpdateState.Failed => _appUpdateBannerEngaged,
+            _ => false,
+        };
+        UpdateAppCommand.NotifyCanExecuteChanged();
+        UpdateYtDlpCommand.NotifyCanExecuteChanged(); // Downloading/ReadyToRestart gate the yt-dlp banner's Update button too.
+    }
+
+    /// <summary>Marshaled like <see cref="OnAppUpdateStatusChanged"/>: fired on whatever thread SettingsViewModel's
+    /// (or this VM's own) yt-dlp -U call runs on. Both UpdateYtDlp (guarded by _ytDlpUpdater.IsUpdating) and
+    /// UpdateApp (guarded the same way, so a Settings-started -U also blocks the app-update banner) depend on it.</summary>
+    private void OnYtDlpUpdaterIsUpdatingChanged()
+        => Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            UpdateYtDlpCommand.NotifyCanExecuteChanged();
+            UpdateAppCommand.NotifyCanExecuteChanged();
+        });
+
+    private bool CanUpdateApp() => _appUpdates.Status.State is AppUpdateState.Available or AppUpdateState.ReadyToRestart
+        && !_ytDlpUpdater.IsUpdating;
+
+    [RelayCommand(CanExecute = nameof(CanUpdateApp))]
+    private async Task UpdateAppAsync()   // one click = download + restart (user decision)
+    {
+        try
+        {
+            _appUpdateBannerEngaged = true;
+            var s = _appUpdates.Status.State == AppUpdateState.ReadyToRestart
+                ? _appUpdates.Status
+                : await _appUpdates.DownloadAsync().ConfigureAwait(true);
+            if (s.State != AppUpdateState.ReadyToRestart) return;
+
+            var scheduled = AppUpdateRestart.ConfirmAndSchedule(_appUpdates, Application.Current?.MainWindow);
+            UpdateYtDlpCommand.NotifyCanExecuteChanged(); // IsApplyScheduled just flipped true (or stayed false)
+            if (scheduled)
+            {
+                AppUpdateRestart.CloseMainWindow(_appUpdates);
+                // Still here = the user said "No" to a Closing prompt and CloseMainWindow reverted the
+                // schedule (CancelScheduledApply) — re-query once more so the button re-enables.
+                UpdateYtDlpCommand.NotifyCanExecuteChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            // AsyncRelayCommand re-throws unhandled exceptions on the UI context, and this app
+            // has no DispatcherUnhandledException handler — this catch must not be removed.
+            Log.Warning(ex, "App update flow failed unexpectedly");
+            StatusText = "App update failed.";
+            UpdateYtDlpCommand.NotifyCanExecuteChanged(); // in case IsApplyScheduled changed before the failure
+        }
+    }
+
+    [RelayCommand]
+    private void DismissAppUpdate()
+    {
+        _appUpdateBannerDismissed = true;
+        HasAppUpdateBanner = false;
+    }
 
     // --- helpers ---
 

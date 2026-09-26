@@ -84,7 +84,7 @@ public void Build_NewFlag_EmittedWhenSet()
 
 ## 프로젝트 설정 메모
 
-- `TargetFramework=net8.0-windows` + `UseWPF=true` — 메인 프로젝트와 TFM
+- `TargetFramework=net10.0-windows` + `UseWPF=true` — 메인 프로젝트와 TFM
   정렬해서 `ProjectReference`가 깔끔하게 풀리도록. 실제로 WPF 타입을
   끌어오는 테스트는 없음.
 - `IsPackable=false` — 실수로 NuGet 패키지에 묶이지 않도록.

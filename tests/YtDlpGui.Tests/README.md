@@ -88,7 +88,7 @@ public void Build_NewFlag_EmittedWhenSet()
 
 ## Project config notes
 
-- `TargetFramework=net8.0-windows` and `UseWPF=true` to match the main
+- `TargetFramework=net10.0-windows` and `UseWPF=true` to match the main
   project's TFM — keeps `ProjectReference` resolution clean even though
   no test actually pulls a WPF type.
 - `IsPackable=false` so this project never ends up in a NuGet output.

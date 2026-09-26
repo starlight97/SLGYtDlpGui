@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:YtDlpGui.ViewModels"
         xmlns:models="clr-namespace:YtDlpGui.Models"
-        Title="YtDlpGui v0.4"
+        Title="{Binding WindowTitle}"
         Width="1180" Height="780"
         MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen"
@@ -172,6 +172,36 @@
                     Command="{Binding UpdateYtDlpCommand}" />
             <Button Grid.Column="2" Content="✕" Padding="8,2" Margin="4,0,0,0" VerticalAlignment="Center"
                     ToolTip="Dismiss for this session" Command="{Binding DismissYtDlpBannerCommand}" />
+          </Grid>
+        </Border>
+
+        <!-- App self-update banner (Velopack + GitHub Releases). -->
+        <Border Visibility="{Binding HasAppUpdateBanner, Converter={StaticResource BoolToVis}}"
+                Background="#E3EEFF" BorderBrush="#8FB3E8" BorderThickness="1"
+                CornerRadius="3" Padding="10,6" Margin="0,0,0,8">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="{Binding AppUpdateBannerText}" Foreground="#0B3A75" FontSize="12"
+                         TextWrapping="Wrap" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Content="{Binding AppUpdateBannerActionText}" Padding="10,2" Margin="6,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding ShowAppUpdateBannerAction, Converter={StaticResource BoolToVis}}"
+                      Command="{Binding UpdateAppCommand}" />
+              <Button Grid.Column="2" Content="✕" Padding="8,2" Margin="4,0,0,0" VerticalAlignment="Center"
+                      ToolTip="Dismiss for this session" Command="{Binding DismissAppUpdateCommand}" />
+            </Grid>
+            <ProgressBar Grid.Row="1" Height="4" Margin="0,6,0,0" Minimum="0" Maximum="100"
+                         Value="{Binding AppUpdateBannerProgress, Mode=OneWay}"
+                         Visibility="{Binding IsAppUpdateBannerDownloading, Converter={StaticResource BoolToVis}}" />
           </Grid>
         </Border>
 

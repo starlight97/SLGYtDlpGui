@@ -164,6 +164,99 @@ public class YtDlpUpdaterTests : IDisposable
     }
 
     [Fact]
+    public async Task SelfUpdate_RaisesIsUpdatingChanged_OnStartAndFinish()
+    {
+        var gate = new TaskCompletionSource<bool>();
+        var runner = new FakeRunner { Gate = gate, Result = new YtDlpRunResult(0, false) };
+        var updater = new YtDlpUpdater(new FakeResolver(_fakeExePath), runner);
+
+        var raisedCount = 0;
+        var isUpdatingWhenFirstRaised = false;
+        updater.IsUpdatingChanged += () =>
+        {
+            if (raisedCount == 0) isUpdatingWhenFirstRaised = updater.IsUpdating;
+            raisedCount++;
+        };
+
+        var task = updater.SelfUpdateAsync(CancellationToken.None);
+
+        Assert.Equal(1, raisedCount);
+        Assert.True(isUpdatingWhenFirstRaised); // raised right after the flag flips to true, not before
+        Assert.True(updater.IsUpdating);
+
+        gate.SetResult(true);
+        await task;
+
+        Assert.Equal(2, raisedCount);
+        Assert.False(updater.IsUpdating);
+    }
+
+    [Fact]
+    public async Task SelfUpdate_RunnerThrows_RaisesIsUpdatingChanged_OnStartAndFinish_AndResets()
+    {
+        var gate = new TaskCompletionSource<bool>();
+        var runner = new FakeRunner { Gate = gate, ThrowException = new InvalidOperationException("boom") };
+        var updater = new YtDlpUpdater(new FakeResolver(_fakeExePath), runner);
+
+        var raisedCount = 0;
+        var isUpdatingWhenFirstRaised = false;
+        updater.IsUpdatingChanged += () =>
+        {
+            if (raisedCount == 0) isUpdatingWhenFirstRaised = updater.IsUpdating;
+            raisedCount++;
+        };
+
+        var task = updater.SelfUpdateAsync(CancellationToken.None);
+
+        Assert.Equal(1, raisedCount);
+        Assert.True(isUpdatingWhenFirstRaised); // raised right after the flag flips to true, not before
+        Assert.True(updater.IsUpdating);
+
+        gate.SetResult(true);
+        var r = await task;
+
+        Assert.False(r.Success);
+        Assert.Null(r.ExitCode);
+        Assert.Equal("boom", r.Message);
+        Assert.Equal(2, raisedCount); // start + finally, even though RunAsync threw
+        Assert.False(updater.IsUpdating);
+    }
+
+    [Fact]
+    public async Task SelfUpdate_ThrowingSubscriber_DoesNotThrow_AndIsUpdatingResetsToFalse()
+    {
+        var runner = new FakeRunner { Result = new YtDlpRunResult(0, false) };
+        var updater = new YtDlpUpdater(new FakeResolver(_fakeExePath), runner);
+
+        updater.IsUpdatingChanged += () => throw new InvalidOperationException("subscriber boom");
+
+        var r = await updater.SelfUpdateAsync(CancellationToken.None);
+
+        Assert.True(r.Success);
+        Assert.False(updater.IsUpdating);
+    }
+
+    [Fact]
+    public async Task SelfUpdate_RejectedConcurrentCall_DoesNotRaiseIsUpdatingChanged()
+    {
+        var gate = new TaskCompletionSource<bool>();
+        var runner = new FakeRunner { Gate = gate, Result = new YtDlpRunResult(0, false) };
+        var updater = new YtDlpUpdater(new FakeResolver(_fakeExePath), runner);
+
+        var raisedCount = 0;
+        var first = updater.SelfUpdateAsync(CancellationToken.None);
+        updater.IsUpdatingChanged += () => raisedCount++;
+
+        var second = await updater.SelfUpdateAsync(CancellationToken.None);
+        Assert.False(second.Success);
+        Assert.Equal(0, raisedCount); // the rejected call never touched the flag
+
+        gate.SetResult(true);
+        await first;
+        Assert.Equal(1, raisedCount); // only the finally of the call that actually ran
+    }
+
+    [Fact]
     public async Task CheckVersion_ParsesVersion_ArgsAreDashDashVersion()
     {
         var runner = new FakeRunner { Lines = new[] { "2026.03.17" }, Result = new YtDlpRunResult(0, false) };

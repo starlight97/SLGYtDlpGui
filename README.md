@@ -29,19 +29,36 @@ See [YtDlpGui-SPEC.md](YtDlpGui-SPEC.md) for the full specification and roadmap.
 - **Settings persistence** — paths, parallelism, theme, and the last-used Options panel state are stored in `%LOCALAPPDATA%\YtDlpGui\settings.json`
 - **Serilog file logging** — daily rolling log at `%LOCALAPPDATA%\YtDlpGui\logs\app-YYYYMMDD.log` (14-day retention)
 - **WPF-UI theming** — System / Light / Dark, with live preview in the Settings dialog
+- **Automatic app updates** — [Velopack](https://velopack.io) + GitHub Releases; a dismissible banner appears a few seconds after startup when a new version is found, and Settings > About has a manual "Check for app updates" button
+
+## Install
+
+Download `SLGYtDlpGui-win-Setup.exe` from [Releases](https://github.com/starlight97/SLGYtDlpGui/releases) and run it.
+
+- No admin rights needed — it installs to `%LocalAppData%\SLGYtDlpGui`, not Program Files, so there's no UAC prompt.
+- Windows SmartScreen may warn once because the build isn't code-signed. Click "More info" > "Run anyway".
+- The installed app is self-contained (bundles its own .NET runtime) — nothing else to install.
+- A portable `SLGYtDlpGui-win-Portable.zip` is also published for a no-install copy; it doesn't auto-update.
 
 ## Requirements
 
 - Windows 10/11 x64
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 - `yt-dlp.exe` and `ffmpeg.exe` — **not bundled**; resolved at runtime
+- Running from source instead of the installer: [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (the installed/self-contained build doesn't need this)
 
 Binary lookup order:
 
 1. Path explicitly set in Settings
-2. Same folder as `YtDlpGui.exe`
-3. Walking up to six directories from the exe (for development convenience — drop `yt-dlp.exe` at the repo root)
-4. `where.exe` lookup on `PATH`
+2. Tools folder — `%LOCALAPPDATA%\YtDlpGui\bin`. Survives app updates/reinstalls, unlike the install folder. Settings > About has an "Open tools folder" button
+3. Same folder as `YtDlpGui.exe`
+4. Debug builds only: walking up to six directories from the exe (development convenience — drop `yt-dlp.exe` at the repo root); Release builds skip this step
+5. `where.exe` lookup on `PATH`
+
+## Updates
+
+The installed app (via Setup.exe) checks GitHub Releases for a new version shortly after startup, and downloading + installing an update restarts the app automatically. F5 builds and unzipped/portable copies never make this network call.
+
+If more than one YtDlpGui window is running, installing an update force-closes the other windows (Velopack replaces the whole install folder in place) — a confirmation prompt warns about this before it happens.
 
 ## Build
 
@@ -49,7 +66,9 @@ Binary lookup order:
 dotnet build YtDlpGui.sln -c Release
 ```
 
-The exe lands at `src/YtDlpGui/bin/Release/net8.0-windows/YtDlpGui.exe`.
+The exe lands at `src/YtDlpGui/bin/Release/net10.0-windows/YtDlpGui.exe`. This is a framework-dependent dev build (needs the .NET 10 Desktop Runtime); it does not check for app updates.
+
+To build the self-contained Setup.exe / Portable.zip installer, see `build/pack.ps1` (requires the `vpk` tool, pinned in `build/dotnet-tools.json`).
 
 ## Project layout
 
@@ -83,7 +102,7 @@ Strict MVVM. No code-behind beyond `InitializeComponent` and tiny visual glue. D
 
 | Layer | Choice |
 |---|---|
-| Runtime | .NET 8 (LTS) |
+| Runtime | .NET 10 (LTS) |
 | UI | WPF + XAML |
 | MVVM | CommunityToolkit.Mvvm (`[ObservableProperty]`, `[RelayCommand]`) |
 | Theming | WPF-UI (lepoco/wpfui) |

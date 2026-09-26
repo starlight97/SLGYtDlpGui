@@ -10,6 +10,9 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         DataContext = vm;
         vm.RequestClose += OnRequestClose;
+        // The IAppUpdateService singleton outlives this transient VM — unsubscribe its StatusChanged
+        // handler here or a new SettingsViewModel (and its handler) leaks on every dialog open.
+        Closed += (_, _) => vm.OnWindowClosed();
 
         void OnRequestClose()
         {

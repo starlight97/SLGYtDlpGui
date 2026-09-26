@@ -33,6 +33,14 @@ public sealed class YtDlpUpdater
 
     public bool IsUpdating => Volatile.Read(ref _updating) == 1;
 
+    /// <summary>
+    /// Raised right after <see cref="IsUpdating"/> flips (on start, and again in the finally),
+    /// on whatever thread <see cref="SelfUpdateAsync"/> runs on. <see cref="IsUpdating"/> is a
+    /// singleton flag shared by the singleton MainViewModel and the transient SettingsViewModel —
+    /// this event is how each one learns the OTHER started/finished a self-update.
+    /// </summary>
+    public event Action? IsUpdatingChanged;
+
     /// <summary>Runs <c>yt-dlp --version</c> and parses the result. Never throws.</summary>
     public async Task<YtDlpVersionCheck> CheckVersionAsync(CancellationToken ct)
     {
@@ -98,6 +106,9 @@ public sealed class YtDlpUpdater
 
         try
         {
+            // Raised inside the try (not before it) so a throwing subscriber still lets the
+            // finally below reset _updating — otherwise the flag would be stuck at 1 forever.
+            RaiseIsUpdatingChanged();
             var path = _binaries.ResolveYtDlp();
             if (path is null || !File.Exists(path))
                 return new YtDlpSelfUpdateResult(false, null, string.Empty, "yt-dlp.exe not found.");
@@ -144,6 +155,22 @@ public sealed class YtDlpUpdater
         finally
         {
             Volatile.Write(ref _updating, 0);
+            RaiseIsUpdatingChanged();
+        }
+    }
+
+    /// <summary>Raises <see cref="IsUpdatingChanged"/>, tolerating a throwing subscriber so
+    /// <see cref="SelfUpdateAsync"/> keeps its "Never throws" contract — a bad handler is logged
+    /// and swallowed rather than escaping and skipping the flag reset / finish notification.</summary>
+    private void RaiseIsUpdatingChanged()
+    {
+        try
+        {
+            IsUpdatingChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "IsUpdatingChanged subscriber threw");
         }
     }
 }

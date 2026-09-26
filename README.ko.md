@@ -29,19 +29,36 @@
 - **설정 영속화** — 경로, 병렬도, 테마, 마지막 Options 패널 상태가 `%LOCALAPPDATA%\YtDlpGui\settings.json`에 저장
 - **Serilog 파일 로깅** — `%LOCALAPPDATA%\YtDlpGui\logs\app-YYYYMMDD.log`에 일별 롤링 (14일 보관)
 - **WPF-UI 테마** — System / Light / Dark, Settings 다이얼로그에서 라이브 프리뷰
+- **앱 자동 업데이트** — [Velopack](https://velopack.io) + GitHub Releases. 시작 몇 초 뒤 새 버전을 찾으면 닫을 수 있는 배너가 뜨고, Settings > About에 수동 "Check for app updates" 버튼도 있음
+
+## 설치
+
+[Releases](https://github.com/starlight97/SLGYtDlpGui/releases)에서 `SLGYtDlpGui-win-Setup.exe`를 받아 실행한다.
+
+- 관리자 권한 불필요 — Program Files가 아니라 `%LocalAppData%\SLGYtDlpGui`에 설치되므로 UAC 창이 뜨지 않는다.
+- 코드 서명이 안 돼 있어 Windows SmartScreen 경고가 한 번 뜰 수 있다. "추가 정보" > "실행"을 누르면 된다.
+- 설치판은 self-contained(자체 .NET 런타임 포함)라 따로 설치할 게 없다.
+- 설치 없이 쓰는 `SLGYtDlpGui-win-Portable.zip`도 함께 배포되지만, 이쪽은 자동 업데이트가 되지 않는다.
 
 ## 요구 사항
 
 - Windows 10/11 x64
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 - `yt-dlp.exe`와 `ffmpeg.exe` — **번들 아님**, 런타임에 검색
+- 설치판이 아니라 소스에서 직접 실행할 경우: [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) 필요 (설치판/self-contained 빌드는 불필요)
 
 바이너리 검색 순서:
 
 1. Settings에서 명시한 경로
-2. `YtDlpGui.exe`와 같은 폴더
-3. exe에서 최대 6단계 위까지 올라가며 검색 (개발 편의 — 레포 루트에 `yt-dlp.exe` 두면 자동 인식)
-4. `PATH`에서 `where.exe`로 검색
+2. 도구 폴더 — `%LOCALAPPDATA%\YtDlpGui\bin`. 설치 폴더와 달리 앱 업데이트/재설치에도 남는다. Settings > About의 "Open tools folder" 버튼으로 바로 열 수 있다
+3. `YtDlpGui.exe`와 같은 폴더
+4. Debug 빌드에서만: exe에서 최대 6단계 위까지 올라가며 검색 (개발 편의 — 레포 루트에 `yt-dlp.exe` 두면 자동 인식). Release 빌드는 이 단계를 건너뜀
+5. `PATH`에서 `where.exe`로 검색
+
+## 업데이트
+
+설치판(Setup.exe로 설치)은 시작 직후 GitHub Releases에서 새 버전을 확인하고, 다운로드 후 설치하면 앱이 자동으로 재시작된다. F5로 실행하거나 압축 해제/포터블 상태로 실행하면 이 네트워크 호출 자체가 일어나지 않는다.
+
+YtDlpGui 창이 여러 개 열려 있을 때 업데이트를 설치하면 나머지 창은 강제로 닫힌다(Velopack이 설치 폴더 전체를 교체하기 때문). 실행 전에 확인 창으로 미리 경고한다.
 
 ## 빌드
 
@@ -49,7 +66,9 @@
 dotnet build YtDlpGui.sln -c Release
 ```
 
-결과물: `src/YtDlpGui/bin/Release/net8.0-windows/YtDlpGui.exe`
+결과물: `src/YtDlpGui/bin/Release/net10.0-windows/YtDlpGui.exe`. 이건 프레임워크 종속 개발용 빌드라 .NET 10 Desktop Runtime이 필요하고, 앱 업데이트 확인도 하지 않는다.
+
+self-contained Setup.exe / Portable.zip 설치파일을 만들려면 `build/pack.ps1`을 참고한다(`build/dotnet-tools.json`에 고정된 `vpk` 도구 필요).
 
 ## 프로젝트 구조
 
@@ -83,7 +102,7 @@ src/YtDlpGui/
 
 | 레이어 | 선택 |
 |---|---|
-| 런타임 | .NET 8 (LTS) |
+| 런타임 | .NET 10 (LTS) |
 | UI | WPF + XAML |
 | MVVM | CommunityToolkit.Mvvm (`[ObservableProperty]`, `[RelayCommand]`) |
 | 테마 | WPF-UI (lepoco/wpfui) |

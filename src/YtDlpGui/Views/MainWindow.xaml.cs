@@ -15,10 +15,12 @@ public partial class MainWindow : Window
         Closing += OnClosing;
     }
 
-    /// <summary>Background yt-dlp age check once the window is up (never blocks first paint).</summary>
+    /// <summary>Background yt-dlp age / app update checks once the window is up (never blocks first paint).</summary>
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel vm) _ = vm.CheckYtDlpVersionAsync();
+        if (DataContext is not MainViewModel vm) return;
+        _ = vm.CheckYtDlpVersionAsync();
+        _ = vm.CheckAppUpdateInBackgroundAsync();
     }
 
     // Auto-scroll the per-item log to the bottom whenever new output arrives.
@@ -38,7 +40,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainViewModel vm) return;
 
-        if (vm.IsUpdatingYtDlp)
+        if (vm.IsYtDlpSelfUpdateActive)
         {
             var updateResult = MessageBox.Show(
                 this,
@@ -58,9 +60,12 @@ public partial class MainWindow : Window
         if (!vm.HasActiveDownloads) return;
 
         var n = vm.ActiveCount;
+        var question = vm.IsRestartingToUpdate
+            ? "Cancel them and restart to install the update?"
+            : "Cancel and exit?";
         var result = MessageBox.Show(
             this,
-            $"There {(n == 1 ? "is" : "are")} {n} active download{(n == 1 ? string.Empty : "s")}. Cancel and exit?",
+            $"There {(n == 1 ? "is" : "are")} {n} active download{(n == 1 ? string.Empty : "s")}. {question}",
             "Active downloads",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);

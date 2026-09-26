@@ -1,0 +1,62 @@
+# Velopack 설치파일 + 자동업데이트 체크리스트
+
+## 작업 항목
+- [x] 작업 전 스냅샷 커밋 (8801ad6)
+- [x] 피어 세션("YouTube 다운로드 실패")에 조율 메시지 전송
+- [x] 피어 세션 답장 확인 → 겹치는 파일 합의 (02-context.md 조율 로그)
+- [x] 조사: 빌드 설정 / 진입점·UI / 파일 경로 + 교차 검증 (wf_fb8343ad-90b)
+- [x] 설계: architect 초안 → 문서 검증 + 충돌 검토 → 수정안 (wf_c1c30fa1-d83 → 05-design.md)
+- [x] 사용자 결정: packId / 첫 버전 / yt-dlp·ffmpeg 처리 범위 → 추천안 적용 (net10은 별도 승인 대기)
+- [x] 피어 "완료" 수신 + 피어 변경분 분리 커밋 (60beec1, 피어 세션이 커밋)
+- **구현 (Phase A+B 통합, wf_0b70d416-8b8)**
+  - [x] core: csproj(Velopack 1.2.158, Version 0.4.0, StartupObject), Program.cs, IAppUpdateService/AppUpdateService, AppUpdateRestart, BinaryResolver(bin 폴더 + DEBUG 전용 부모 탐색), App.xaml.cs DI, build/dotnet-tools.json, build/pack.ps1, 테스트 24개
+  - [x] ui: SettingsViewModel(앱 업데이트 + 도구 폴더 + YtDlpUpdater 위임), SettingsWindow.xaml(.cs), MainViewModel 배너 + 재시작 차단, MainWindow.xaml(.cs), 피어 테스트 8번째 인자, README
+  - [x] 격리 빌드 + 테스트: 경고 0, 148/148 통과
+  - [x] 코드리뷰 3개 관점 + judge: 원본 8건 → 확정 1건(major: 공유 IsUpdating 플래그 미확인), 반박 6건
+  - [x] 확정된 문제 수정: `IsYtDlpSelfUpdateActive` 추가 + CanRestartToUpdate/CanUpdateApp 공유 가드
+  - [x] 최종 빌드/테스트 + pack.ps1 → Setup.exe(81MB)/Portable.zip/full nupkg(74MB), "Verified VelopackApp.Run()", 미설치 스모크 OK(installed=false)
+- **후속 + 설치 테스트 + net10 (wf_cb39221c-526)**
+  - [x] 후속 수정: 반대 방향 가드(앱 업데이트 중 yt-dlp Update 막기), YtDlpUpdater.IsUpdatingChanged 이벤트로 VM 간 재조회, 제목에 버전 바인딩, 테스트 11개 → 리뷰(첫 이벤트 발생을 try 안으로 이동) — 159/159 통과
+  - [x] E2E를 tester 서브에이전트가 거부함(워크플로 안의 승인 문구는 사용자 승인으로 검증 불가) → **설치/업데이트/제거 E2E는 Master가 직접 실행**(사용자가 이 대화에서 직접 승인), 코드 수정은 계속 위임
+  - [x] E2E 전 수정 (wf_52e62cca-691): CancelScheduledApply/ScheduleApplyOnExit가 StatusChanged를 발생시키지 않던 문제(major), UpdateAppAsync 방어적 try/catch, YtDlpUpdater 예외 경로 테스트(피어 요청) → 리뷰 162/162. coder 보고가 형식만 채운 값이어서 analyzer로 3건 모두 반영된 것을 확인함
+  - [ ] 남은 minor (net10 단계에서 처리): YtDlpUpdater의 IsUpdatingChanged 호출에 구독자 예외 방어가 없음("Never throws" 계약), FakeAppUpdateService.RaiseStatusChanged 미사용(테스트 추가 또는 제거)
+  - **E2E-1 (net8, Master가 직접 실행)**
+    - [x] 0.4.0 재패키징(최신 코드, publish 16:21 > 최신 소스 16:10), "Verified VelopackApp.Run()"
+    - [x] `Setup.exe --silent` 설치: 2초, consent.exe 없음(UAC 없음), `%LocalAppData%\SLGYtDlpGui\{current,packages,Update.exe,YtDlpGui.exe}`, sq.version 0.4.0, 바로가기 2개(바탕화면, 시작 메뉴; 작업 폴더 = current), HKCU 제거 키(DisplayName YtDlpGui, Publisher SLGarden), install hook 194ms
+    - [x] 첫 실행(바로가기와 같은 방식): `installed=true version=0.4.0 cwd=%UserProfile%`(D11 OK), 제목 "YtDlpGui v0.4.0"
+    - [x] Settings > About: "You're up to date (0.4.0)." (시작 시 자동 확인 + 수동 Check 모두 정상, GitHub 릴리스 0개)
+    - [x] 도구 폴더: bin\yt-dlp.exe가 PATH보다 먼저 선택됨 → 테스트용 bin 삭제
+    - [x] 0.4.0 → 0.4.1 업데이트(로컬 피드, 배너 "Update & restart"): delta 0.16MB(497개 중 5개 파일 패치), 배너 표시 → 클릭 → 8초 다운로드 → "will be applied after exit" → 정상 종료(OnExit) → 약 3초 뒤 v0.4.1로 재시작, Velopack 로그 "Package version 0.4.1 applied successfully", 설정(Theme/출력 폴더/경로 지정) 유지, 0.4.1에서 Check → "You're up to date (0.4.1)."
+    - [x] settings.json 원본 해시로 복원 (FC11E8D4…)
+  - [x] net10 리타깃 (wf_d0bbd8e4-21a): TFM, Hosting 제거, SatelliteResourceLanguages en;ko, pubxml/README, 남은 minor 2건(IsUpdatingChanged 구독자 예외 방어, RaiseStatusChanged 사용 테스트), Version 0.4.2 → 리뷰 164/164, 경고 0
+  - **E2E-2 (Master)**
+    - [x] 0.4.2(net10) 패키징: CoreLib 10.0.326, 언어 리소스 폴더는 `ko`만, publish 169MB→138MB, Setup 81→71MB, full nupkg 74→64MB
+    - [x] D12 창 여러 개: #1이 Settings에서 다운로드만 → Settings와 배너가 모두 "0.4.2 is ready"(싱글턴 상태 공유) → #2 시작 시 자동 적용 안 함(`pending=0.4.2`, exe는 0.4.1 그대로) → #2에서 Restart 누르면 경고 "Another YtDlpGui window is open…" → 아니요 → 둘 다 살아 있음. 참고: 한국어 Windows에서는 MessageBox 버튼 이름이 "예(Y)/아니요(N)"이고 UIA에 Pane으로 노출됨 → WM_COMMAND IDNO로 응답
+    - [x] #2 닫고 #1에서 Restart(경고 없음) → 4초 뒤 종료 → 6초 뒤 **v0.4.2(net10, coreclr 10.0.326)** 로 재시작, Velopack 로그 "Package version 0.4.2 applied successfully"
+    - [x] 테마 스모크: System/Light/Dark 전환과 Save 모두 크래시 없음, ERR/FTL 로그 없음. ⚠ 테마 설정이 메인 화면 모양을 바꾸지 않음 → net8 빌드도 똑같아서 **기존 동작이지 net10 회귀가 아님** (범위 밖, 사용자에게 보고)
+    - [x] 제거(`Update.exe uninstall --silent`): 1초, 바로가기 2개와 HKCU 제거 키 삭제, 설치 폴더는 몇 초 뒤 완전히 삭제, `%LocalAppData%\YtDlpGui`(settings/logs) 유지
+    - [x] 복원: settings.json 원본 해시(FC11E8D4…), profiles.json/bin은 원래처럼 없음, 남은 프로세스 없음
+    - 참고: 두 인스턴스가 동시에 돌면 Serilog가 `app-YYYYMMDD_001.log`로 따로 기록함(정상)
+  - [x] 마무리 (wf_f8e01a8b-499): Version 0.4.0 원복, SPEC.md와 .gitignore의 ".NET 8" 문구 수정 → 전체 diff 최종 리뷰에서 **버그 1건 수정**(Settings "Download update"가 yt-dlp -U 중에도 활성화되고 VM 간 재조회도 빠져 있었음) → 경고 0, 164/164
+  - [x] 배포용 0.4.0(net10) 재패키징: 테스트용 Releases 삭제 → pack(publish 16:53:51 > 최신 소스 16:51:58), Setup 71.1MB / Portable 63.9MB / full nupkg 63.9MB / releases.win.json
+  - 남은 minor (후속 과제): AppUpdateServiceTests의 100ms 타이밍 테스트가 느린 CI에서 흔들릴 여지 있음, 테마 설정이 메인 화면에 반영되지 않는 문제(기존 동작, DynamicResource 배선은 정상이라 런타임 조사 필요)
+  - [x] E2E 준비: settings.json 백업(profiles.json은 원래 없음, SHA256 FC11E8D4…) → scratchpad\e2e-backup-original, UIA 헬퍼 scratchpad\uia.ps1, PATH의 yt-dlp = %UserProfile%\yt-dlp\yt-dlp.exe, 오버라이드 없음, Theme=Dark
+  - [ ] 워크플로우 종료 후 확인 (피어 요건): IsUpdatingChanged가 ① 핸들러에서 Dispatcher.BeginInvoke로 처리되고 ② SettingsViewModel.OnWindowClosed에서 구독 해제되며 ③ 시작 1회 + finally 1회 발생하는지. YtDlpUpdaterTests에 "이벤트 2회"와 "예외 경로에서도 끝 이벤트" 테스트가 없으면 추가 → 피어에게 결과 전달
+- **사용자 승인됨 (2026-09-26: "설치 테스트 너가 해주고 net10도 진행해")** — 구현 워크플로우 완료 후 순서대로
+  - [x] 피어에게 net10 리타깃·설치 E2E 사전 알림 (피어: 빌드/수정 계획 없음, 겹침 없음)
+  - [ ] E2E 전 `%LocalAppData%\YtDlpGui\settings.json`, `profiles.json` 백업 → E2E 후 복원 (피어 권고: 설치본이 종료할 때 저장하면 실행 중인 Debug 앱 설정을 덮어쓸 수 있음)
+  - [ ] E2E-1 (net8): 0.4.0 Setup 설치(UAC 없음, 경로, 바로가기) → 로컬 피드 0.4.1 앱 내 업데이트(Check→Download→Restart) → 설정/로그 유지, 도구 폴더, 다중 인스턴스
+  - [ ] Phase C: net10.0-windows 리타깃 (두 csproj, Hosting 제거) → 빌드/테스트 → 코드리뷰
+  - [ ] E2E-2: 설치된 0.4.1(net8) → 0.4.2(net10) 업데이트, 테마/창 스모크 → 제거(SLGYtDlpGui만 삭제, YtDlpGui 데이터 유지)
+  - [ ] 정리: Version 0.4.0 원복, 테스트 Releases 삭제, 배포용 0.4.0(net10) 재패키징
+- **마무리**
+  - [x] 커밋 (/push: stash→pull(최신)→pop → code-reviewer 사전 점검 통과(파일 36개 일치, 비밀정보 없음, 164/164) → dev-docs의 로컬 사용자 경로를 `%UserProfile%`로 바꿈 → 경로를 지정해 개별 add, 피어에게 사전 알림)
+  - [ ] GitHub 릴리스 업로드는 사용자가 직접 (토큰 필요)
+
+## 완료 조건
+- [x] 빌드 에러 없음 (경고 0)
+- [x] 전체 테스트 통과 (피어 테스트 포함, 164/164)
+- [x] Setup.exe 설치 → 실행 시 UAC 없음
+- [x] 기존 기능 정상 동작 (설정 저장/유지, yt-dlp 탐색, 피어 yt-dlp 배너; 실제 다운로드는 E2E 범위 밖)
+- [x] 업데이트 후에도 설정 유지 (도구 폴더 bin은 업데이트 대상 밖이라 유지됨)
+- [x] 코딩 컨벤션 준수 (컨벤션 파일이 빈 템플릿이라 주변 코드 스타일 기준, code-reviewer 여러 차례)

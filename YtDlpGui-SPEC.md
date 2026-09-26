@@ -24,7 +24,7 @@ This is a personal-use tool first. Distribution is a non-goal for v1.
 
 | Layer | Choice | Why |
 |---|---|---|
-| Runtime | **.NET 8 (LTS)** | Modern, supported, single-file publish |
+| Runtime | **.NET 10 (LTS)** | Modern, supported, single-file publish |
 | UI | **WPF + XAML** | Native Windows, leverages C# experience |
 | MVVM | **CommunityToolkit.Mvvm** | `[ObservableProperty]`, `[RelayCommand]` source-gen — very low ceremony |
 | Theming | **WPF-UI (lepoco/wpfui)** | Fluent / WinUI3-style controls, dark mode out of the box |
@@ -248,7 +248,7 @@ Bake in the post-process Hangul fix that the user already validated:
   ```
   -c Release -r win-x64
   -p:PublishSingleFile=true
-  -p:SelfContained=false       # user has .NET 8 runtime; smaller binary
+  -p:SelfContained=false       # user has .NET 10 runtime; smaller binary
   -p:PublishReadyToRun=true
   ```
   (Provide a `self-contained` profile too for a fully portable ~70MB build.)

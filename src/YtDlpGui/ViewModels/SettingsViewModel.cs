@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -24,7 +25,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IConfImporter _importer;
     private readonly OptionsViewModel _options;
     private readonly IBinaryResolver _binaries;
-    private readonly IYtDlpRunner _runner;
+    private readonly YtDlpUpdater _updater;
+    private readonly IAppUpdateService _appUpdates;
     private readonly string _originalTheme;
 
     public SettingsViewModel(
@@ -32,13 +34,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         IConfImporter importer,
         OptionsViewModel options,
         IBinaryResolver binaries,
-        IYtDlpRunner runner)
+        YtDlpUpdater updater,
+        IAppUpdateService appUpdates)
     {
         _store = store;
         _importer = importer;
         _options = options;
         _binaries = binaries;
-        _runner = runner;
+        _updater = updater;
+        _appUpdates = appUpdates;
         var s = store.Current;
         _ytDlpPathOverride = s.YtDlpPathOverride;
         _ffmpegPathOverride = s.FfmpegPathOverride;
@@ -55,6 +59,14 @@ public sealed partial class SettingsViewModel : ObservableObject
             Path.GetDirectoryName(SettingsFilePath) ?? string.Empty,
             "logs");
         AppVersion = typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
+        BinFolderPath = BinaryResolver.GetManagedBinDirectory(store);
+
+        _appUpdates.StatusChanged += OnAppUpdateStatusChanged;
+        ApplyAppUpdateStatus(_appUpdates.Status);
+
+        // YtDlpUpdater.IsUpdating is a singleton flag also flipped by the singleton MainViewModel's
+        // banner Update button — this transient VM must re-query its own commands when that happens.
+        _updater.IsUpdatingChanged += OnYtDlpUpdaterIsUpdatingChanged;
     }
 
     /// <summary>Live-preview the theme as the user changes the dropdown.</summary>
@@ -66,14 +78,110 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string SettingsFilePath { get; }
     public string LogFolderPath { get; }
     public string AppVersion { get; }
+    public string BinFolderPath { get; }
 
     [ObservableProperty] private string _ytDlpVersion = "(click Check)";
     [ObservableProperty] private string _ffmpegVersion = "(click Check)";
     [ObservableProperty] private bool _isUpdatingYtDlp;
     [ObservableProperty] private string _selfUpdateStatus = string.Empty;
 
+    // --- App self-update (Velopack / GitHub Releases) ---
+    [ObservableProperty] private string _appUpdateStatusText = string.Empty;
+    [ObservableProperty] private int _appUpdateProgress;
+    [ObservableProperty] private bool _isAppUpdateDownloading;
+    [ObservableProperty] private bool _isAppUpdateAvailable;
+    [ObservableProperty] private bool _isAppUpdateReady;
+
     partial void OnIsUpdatingYtDlpChanged(bool value)
-        => SelfUpdateYtDlpCommand.NotifyCanExecuteChanged();
+    {
+        SelfUpdateYtDlpCommand.NotifyCanExecuteChanged();
+        RestartToUpdateCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Called from SettingsWindow.Closed — the services outlive this transient VM.</summary>
+    public void OnWindowClosed()
+    {
+        _appUpdates.StatusChanged -= OnAppUpdateStatusChanged;
+        _updater.IsUpdatingChanged -= OnYtDlpUpdaterIsUpdatingChanged;
+    }
+
+    // Raised on a background thread; always render the latest snapshot.
+    private void OnAppUpdateStatusChanged(AppUpdateStatus _)
+        => Application.Current?.Dispatcher.BeginInvoke(() => ApplyAppUpdateStatus(_appUpdates.Status));
+
+    /// <summary>Marshaled like <see cref="OnAppUpdateStatusChanged"/>: fired on whatever thread MainViewModel's
+    /// (or this VM's own) yt-dlp -U call runs on. SelfUpdate, RestartToUpdate and DownloadAppUpdate are all
+    /// guarded by _updater.IsUpdating.</summary>
+    private void OnYtDlpUpdaterIsUpdatingChanged()
+        => Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            SelfUpdateYtDlpCommand.NotifyCanExecuteChanged();
+            RestartToUpdateCommand.NotifyCanExecuteChanged();
+            DownloadAppUpdateCommand.NotifyCanExecuteChanged();
+        });
+
+    private void ApplyAppUpdateStatus(AppUpdateStatus s)
+    {
+        AppUpdateStatusText = DescribeAppUpdate(s);
+        AppUpdateProgress = s.Progress;
+        IsAppUpdateDownloading = s.State == AppUpdateState.Downloading;
+        IsAppUpdateAvailable = s.State == AppUpdateState.Available;
+        IsAppUpdateReady = s.State == AppUpdateState.ReadyToRestart;
+        CheckAppUpdateCommand.NotifyCanExecuteChanged();
+        DownloadAppUpdateCommand.NotifyCanExecuteChanged();
+        RestartToUpdateCommand.NotifyCanExecuteChanged();
+        SelfUpdateYtDlpCommand.NotifyCanExecuteChanged(); // Downloading/apply-scheduled also gate yt-dlp's own -U.
+    }
+
+    private static string DescribeAppUpdate(AppUpdateStatus s) => s.State switch
+    {
+        AppUpdateState.NotInstalled =>
+            "Automatic updates work only in the installed app (Setup.exe). This copy runs from a build/unzipped folder.",
+        AppUpdateState.Idle => $"Current version {s.CurrentVersion}.",
+        AppUpdateState.Checking => "Checking GitHub for a new version…",
+        AppUpdateState.UpToDate => $"You're up to date ({s.CurrentVersion}).",
+        AppUpdateState.Available => $"Version {s.AvailableVersion} is available (current {s.CurrentVersion}).",
+        AppUpdateState.Downloading => $"Downloading {s.AvailableVersion}… {s.Progress}%",
+        AppUpdateState.ReadyToRestart =>
+            $"Version {s.AvailableVersion} is ready. Restart to finish updating — otherwise it is applied the next time YtDlpGui starts.",
+        AppUpdateState.Failed => $"App update failed: {s.Error}",
+        _ => string.Empty,
+    };
+
+    private bool CanCheckAppUpdate() => _appUpdates.IsInstalled
+        && _appUpdates.Status.State is not (AppUpdateState.Checking or AppUpdateState.Downloading or AppUpdateState.ReadyToRestart);
+
+    [RelayCommand(CanExecute = nameof(CanCheckAppUpdate))]
+    private Task CheckAppUpdateAsync() => _appUpdates.CheckAsync();
+
+    // Must never race a yt-dlp -U self-replace: DownloadUpdatesAsync writes into the install folder,
+    // the same hazard CanSelfUpdate already guards against in the other direction.
+    private bool CanDownloadAppUpdate() => _appUpdates.Status.State == AppUpdateState.Available && !_updater.IsUpdating;
+
+    [RelayCommand(CanExecute = nameof(CanDownloadAppUpdate))]
+    private Task DownloadAppUpdateAsync() => _appUpdates.DownloadAsync();
+
+    private bool CanRestartToUpdate() => _appUpdates.Status.State == AppUpdateState.ReadyToRestart && !_updater.IsUpdating;
+
+    [RelayCommand(CanExecute = nameof(CanRestartToUpdate))]
+    private void RestartToUpdate()
+    {
+        if (!AppUpdateRestart.ConfirmAndSchedule(_appUpdates, ActiveOwner())) return;
+        SelfUpdateYtDlpCommand.NotifyCanExecuteChanged(); // IsApplyScheduled just flipped true
+
+        Cancel(); // close Settings like the Cancel button (reverts theme preview; unsaved edits are dropped)
+
+        // Posted so it runs after the modal Settings loop has unwound.
+        Application.Current?.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+            new Action(() => AppUpdateRestart.CloseMainWindow(_appUpdates)));
+    }
+
+    [RelayCommand]
+    private void OpenBinFolder()
+    {
+        try { Directory.CreateDirectory(BinFolderPath); } catch { /* surfaced if open fails */ }
+        OpenInExplorer(BinFolderPath);
+    }
 
     [ObservableProperty] private string _ytDlpPathOverride;
     [ObservableProperty] private string _ffmpegPathOverride;
@@ -168,38 +276,27 @@ public sealed partial class SettingsViewModel : ObservableObject
             : await GetExeVersionAsync(ffmpeg, new[] { "-version" }).ConfigureAwait(true);
     }
 
-    private bool CanSelfUpdate() => !IsUpdatingYtDlp;
+    // Must never race an app-update download/apply: Velopack writes into the install folder while
+    // downloading, and force-kills every process under it once a restart-to-apply is scheduled/in progress.
+    private bool CanSelfUpdate() => !IsUpdatingYtDlp && !_updater.IsUpdating
+        && _appUpdates.Status.State != AppUpdateState.Downloading && !_appUpdates.IsApplyScheduled;
 
-    /// <summary>SPEC §5.6: in-place upgrade via <c>yt-dlp -U</c>.</summary>
+    /// <summary>SPEC §5.6: in-place upgrade via <c>yt-dlp -U</c>, delegated to <see cref="YtDlpUpdater"/>
+    /// so the banner's Update button and this one share the same "only one -U at a time" guard.</summary>
     [RelayCommand(CanExecute = nameof(CanSelfUpdate))]
     private async Task SelfUpdateYtDlpAsync()
     {
-        var ytDlp = _binaries.ResolveYtDlp();
-        if (ytDlp is null)
-        {
-            SelfUpdateStatus = "yt-dlp.exe not found.";
-            return;
-        }
-
         IsUpdatingYtDlp = true;
-        SelfUpdateStatusUpdate("Running yt-dlp -U…");
+        SelfUpdateStatus = "Running yt-dlp -U…";
         try
         {
-            var sb = new StringBuilder();
-            var result = await _runner.RunAsync(
-                ytDlp,
-                new[] { "-U", "--no-color" },
-                workingDirectory: null,
-                onLine: line => sb.AppendLine(line),
-                ct: CancellationToken.None).ConfigureAwait(true);
-
-            var output = sb.ToString().Trim();
-            SelfUpdateStatus = result.ExitCode == 0 && !result.SawErrorPrefix
-                ? $"Done.\n{output}"
-                : $"Failed (exit {result.ExitCode}).\n{output}";
+            var r = await _updater.SelfUpdateAsync(CancellationToken.None).ConfigureAwait(true);
+            SelfUpdateStatus = r.Success ? $"Done.\n{r.Output}" : $"{r.Message}\n{r.Output}";
         }
         catch (Exception ex)
         {
+            // YtDlpUpdater.SelfUpdateAsync never throws, but AsyncRelayCommand re-throws unhandled
+            // exceptions on the UI context and this app has no DispatcherUnhandledException handler.
             SelfUpdateStatus = $"Failed: {ex.Message}";
         }
         finally
@@ -207,8 +304,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             IsUpdatingYtDlp = false;
         }
     }
-
-    private void SelfUpdateStatusUpdate(string s) => SelfUpdateStatus = s;
 
     private static async Task<string> GetExeVersionAsync(string exePath, string[] args)
     {
@@ -282,15 +377,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             var dir = Path.GetDirectoryName(YtDlpPathOverride);
             if (Directory.Exists(dir)) return dir;
         }
-        // Walk from app exe up to repo root looking for a yt-dlp.exe — same heuristic BinaryResolver uses.
-        var here = AppContext.BaseDirectory;
-        var d = new DirectoryInfo(here);
-        for (var i = 0; i < 6 && d is not null; i++, d = d.Parent)
-        {
-            if (File.Exists(Path.Combine(d.FullName, "yt-dlp.exe")))
-                return d.FullName;
-        }
-        return null;
+        // Same lookup the downloader uses (override → tools folder → next to app → PATH).
+        var ytDlp = _binaries.ResolveYtDlp();
+        var resolvedDir = string.IsNullOrEmpty(ytDlp) ? null : Path.GetDirectoryName(ytDlp);
+        return Directory.Exists(resolvedDir) ? resolvedDir : null;
     }
 
     private static Window? ActiveOwner()

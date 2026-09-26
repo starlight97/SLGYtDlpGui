@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,15 +10,33 @@
     <RootNamespace>YtDlpGui</RootNamespace>
     <AssemblyName>YtDlpGui</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Custom entry point so VelopackApp runs before WPF (Program.cs). App.xaml intentionally stays
+         ApplicationDefinition (verified: no CS0017, passes vpk's VelopackApp check). -->
+    <StartupObject>YtDlpGui.Program</StartupObject>
+    <!-- Single source of truth: Settings > About and build/pack.ps1 (vpk packVersion flag). 3-part SemVer2. -->
+    <Version>0.4.0</Version>
+    <!-- Only ship English + Korean satellite resource assemblies (avoid pulling in every SDK-bundled culture). -->
+    <SatelliteResourceLanguages>en;ko</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- Drop Assets\app.ico in later: exe/shortcut icon pick it up and pack.ps1 passes it to vpk (icon flag). -->
+  <PropertyGroup Condition="Exists('Assets\app.ico')">
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="Serilog" Version="4.0.2" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="WPF-UI" Version="3.0.5" />
+    <!-- Must equal the vpk version in build/dotnet-tools.json (pack.ps1 enforces). -->
+    <PackageReference Include="Velopack" Version="1.2.158" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- AppUpdateService / BinaryResolver / Program test seams. -->
+    <InternalsVisibleTo Include="YtDlpGui.Tests" />
   </ItemGroup>
 
 </Project>

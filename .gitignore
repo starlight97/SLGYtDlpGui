@@ -1,4 +1,4 @@
-## .gitignore for .NET 8.0 / WPF / Visual Studio project
+## .gitignore for .NET 10.0 / WPF / Visual Studio project
 ## Based on https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 ## with additional entries for JetBrains Rider, OS junk, and project-specific items.
 

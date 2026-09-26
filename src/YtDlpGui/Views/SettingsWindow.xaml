@@ -16,6 +16,7 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="FontSize" Value="11" />
     </Style>
+    <BooleanToVisibilityConverter x:Key="BoolToVis" />
   </Window.Resources>
 
   <Grid Background="{DynamicResource ApplicationBackgroundBrush}">
@@ -37,7 +38,7 @@
           <Button Grid.Column="1" Content="Browse…" Padding="10,4" Margin="6,0,0,0"
                   Command="{Binding BrowseYtDlpCommand}" />
         </Grid>
-        <TextBlock Text="Empty = auto-detect (next to app, repo root, or PATH)."
+        <TextBlock Text="Empty = auto-detect: tools folder (see About), next to the app, then PATH."
                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10" Margin="0,2,0,0" />
 
         <TextBlock Text="ffmpeg.exe path (override)" Style="{StaticResource SectionLabel}" />
@@ -118,6 +119,20 @@
                        TextWrapping="Wrap"
                        Text="{Binding SelfUpdateStatus, Mode=OneWay}" />
 
+            <TextBlock Text="App updates" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="{Binding AppUpdateStatusText, Mode=OneWay}" TextWrapping="Wrap" />
+            <ProgressBar Height="4" Margin="0,6,0,0" Minimum="0" Maximum="100"
+                         Value="{Binding AppUpdateProgress, Mode=OneWay}"
+                         Visibility="{Binding IsAppUpdateDownloading, Converter={StaticResource BoolToVis}}" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Padding="10,4" Content="Check for app updates" Command="{Binding CheckAppUpdateCommand}" />
+              <Button Padding="10,4" Margin="6,0,0,0" Content="Download update" Command="{Binding DownloadAppUpdateCommand}"
+                      Visibility="{Binding IsAppUpdateAvailable, Converter={StaticResource BoolToVis}}" />
+              <Button Padding="10,4" Margin="6,0,0,0" Content="Restart to update" Command="{Binding RestartToUpdateCommand}"
+                      ToolTip="Closes the app (unsaved changes in this dialog are discarded), installs the update and restarts."
+                      Visibility="{Binding IsAppUpdateReady, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
+
             <TextBlock Margin="0,12,0,0">
               <Run Text="Settings file:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <Run Text="{Binding SettingsFilePath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
@@ -126,11 +141,19 @@
               <Run Text="Log folder:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <Run Text="{Binding LogFolderPath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
             </TextBlock>
+            <TextBlock Margin="0,2,0,0">
+              <Run Text="Tools folder:" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <Run Text="{Binding BinFolderPath, Mode=OneWay}" FontFamily="Consolas, Cascadia Mono" FontSize="11" />
+            </TextBlock>
+            <TextBlock Text="Put yt-dlp.exe / ffmpeg.exe here — this folder survives app updates."
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
               <Button Padding="10,4" Content="Open settings folder"
                       Command="{Binding OpenSettingsFolderCommand}" />
               <Button Padding="10,4" Margin="6,0,0,0" Content="Open log folder"
                       Command="{Binding OpenLogFolderCommand}" />
+              <Button Padding="10,4" Margin="6,0,0,0" Content="Open tools folder"
+                      Command="{Binding OpenBinFolderCommand}" />
             </StackPanel>
           </StackPanel>
         </Border>

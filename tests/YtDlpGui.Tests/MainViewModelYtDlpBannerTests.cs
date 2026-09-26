@@ -39,7 +39,8 @@ public class MainViewModelYtDlpBannerTests : IDisposable
             options,
             settings,
             new NullServiceProvider(),
-            updater);
+            updater,
+            new FakeAppUpdateService());
         return (vm, runner);
     }
 
